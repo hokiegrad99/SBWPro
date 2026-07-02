@@ -3,8 +3,11 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+// `base` matches the GitHub Pages repo name so asset paths resolve correctly
+// when the site is served from https://<username>.github.io/SBWPro/.
 export default defineConfig(() => {
   return {
+    base: '/SBWPro/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
