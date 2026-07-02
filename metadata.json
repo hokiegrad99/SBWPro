@@ -1,0 +1,6 @@
+{
+  "name": "Savings Bond Wizard",
+  "description": "A tool to display, sort, analyze, and manage US Treasury Savings Bonds, including federal tax estimation and CSV/HTML import/export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
