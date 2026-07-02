@@ -58,9 +58,12 @@ This repo is pre-configured for GitHub Pages at **`https://(your-username).githu
 
 ### One-time setup
 
-1. On GitHub, go to **Settings → Pages**.
-2. Under **Build and deployment → Source**, choose **GitHub Actions**.
-3. _(Optional but recommended)_ Confirm that the deployed repository visibility is **Public** so Pages can serve it.
+The workflow at [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) automatically enables GitHub Pages for you (via the `enablement: 'true'` input on `actions/configure-pages@v5`), so in most cases you don't need to touch any settings yourself — just push to `main` and the site will appear at your Pages URL within a minute.
+
+> **If the very first deploy fails with `Get Pages site failed... Error: Not Found`:**
+> that means GitHub hasn't initialized the Pages resource for the repository yet. Open **Settings → Pages**, pick **GitHub Actions** as the build source (you don't need to commit anything), then push again. On every subsequent run the workflow handles enablement itself.
+
+_(Optional but recommended)_ Confirm that the repository visibility is **Public** so Pages can serve it.
 
 ### Every push to `main`
 

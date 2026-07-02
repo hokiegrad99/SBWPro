@@ -43,6 +43,14 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+        with:
+          # Auto-enable Pages if it isn't already, and ensure the build
+          # source is set to GitHub Actions. This is the documented fix for
+          # the "Get Pages site failed... Error: Not Found" error that
+          # appears on a brand-new repository whose Pages flag has never
+          # been initialized.
+          # Docs: https://github.com/actions/configure-pages
+          enablement: 'true'
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
