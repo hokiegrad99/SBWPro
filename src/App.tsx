@@ -1,68 +1,94 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  TrendingUp, 
-  Wallet, 
-  Coins, 
-  Download, 
-  Upload, 
-  Plus, 
-  Trash2, 
-  Search, 
-  Moon, 
-  Sun, 
-  RefreshCw, 
-  FileSpreadsheet, 
-  FileCode, 
-  AlertTriangle, 
-  X, 
-  Info, 
-  ChevronUp, 
-  ChevronDown, 
-  CheckSquare, 
-  Square, 
-  Edit2, 
-  Check, 
+  TrendingUp,
+  Wallet,
+  Coins,
+  Download,
+  Upload,
+  Plus,
+  Trash2,
+  Search,
+  Moon,
+  Sun,
+  RefreshCw,
+  FileSpreadsheet,
+  FileCode,
+  AlertTriangle,
+  X,
+  Info,
+  ChevronUp,
+  ChevronDown,
+  CheckSquare,
+  Square,
+  Edit2,
+  Check,
   HelpCircle,
   Clock,
   BookOpen,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Users,
 } from 'lucide-react';
 import { Bond, SortField, SortDirection } from './types';
 import { SAMPLE_BONDS } from './data/sampleBonds';
-import { 
-  parseBondsFromHTML, 
-  generateTreasuryHTML, 
-  parseBondsFromCSV, 
-  generateCSV, 
-  isBondMatured 
+import {
+  parseBondsFromHTML,
+  generateTreasuryHTML,
+  parseBondsFromCSV,
+  generateCSV,
+  isBondMatured
 } from './utils/bondParser';
+import {
+  ensureProfilesInitialized,
+  migrateLegacyData,
+  listProfiles,
+  saveProfiles,
+  loadProfileData,
+  saveProfileData,
+  deleteProfileData,
+  getActiveProfileName,
+  setActiveProfileName,
+  profileNameExists,
+  ProfileMeta,
+} from './utils/profiles';
+
+const DEFAULT_PROFILE_NAME = 'Default';
 
 export default function App() {
   // --- Core State ---
+  // Run the one-time legacy-data migration + profile system
+  // initialization before any profile data is read. Both are idempotent.
+  const [currentProfile, setCurrentProfile] = useState<string>(() => {
+    migrateLegacyData(DEFAULT_PROFILE_NAME);
+    ensureProfilesInitialized(DEFAULT_PROFILE_NAME, SAMPLE_BONDS);
+    return getActiveProfileName() ?? DEFAULT_PROFILE_NAME;
+  });
+
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
+
   const [bonds, setBonds] = useState<Bond[]>(() => {
-    const saved = localStorage.getItem('bonds_wizard_portfolio');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error("Failed to parse saved bonds", e);
-      }
-    }
-    return SAMPLE_BONDS; // default to the provided 53 bonds
+    const profile = getActiveProfileName() ?? DEFAULT_PROFILE_NAME;
+    const data = loadProfileData(profile);
+    return data.bonds.length > 0 ? data.bonds : SAMPLE_BONDS;
   });
 
   const [selectedSerials, setSelectedSerials] = useState<string[]>(() => {
-    const saved = localStorage.getItem('bonds_wizard_selected');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
+    const profile = getActiveProfileName() ?? DEFAULT_PROFILE_NAME;
+    return loadProfileData(profile).selected;
   });
+
+  // When the active profile changes, swap the in-memory state over to
+  // that profile's stored portfolio. Runs after switchProfile/handlers
+  // have already written the previous profile's data.
+  useEffect(() => {
+    if (!currentProfile) return;
+    const data = loadProfileData(currentProfile);
+    setBonds(data.bonds.length > 0 ? data.bonds : []);
+    setSelectedSerials(data.selected);
+    // Intentionally no deps on bonds/selectedSerials — we want this to
+    // fire only when the *profile* changes, not every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProfile]);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('bonds_wizard_dark_mode');
@@ -106,12 +132,21 @@ export default function App() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   // --- Persistence Sync ---
+  // Portfolio data is namespaced under the active profile. We deliberately
+  // depend ONLY on `bonds` / `selectedSerials` (not on `currentProfile`):
+  // the profile-switching effect above replaces these values atomically, and
+  // skipping persistence on the profile-change render avoids clobbering the
+  // newly-loaded data with the previous profile's data.
   useEffect(() => {
-    localStorage.setItem('bonds_wizard_portfolio', JSON.stringify(bonds));
+    if (currentProfile) {
+      saveProfileData(currentProfile, { bonds });
+    }
   }, [bonds]);
 
   useEffect(() => {
-    localStorage.setItem('bonds_wizard_selected', JSON.stringify(selectedSerials));
+    if (currentProfile) {
+      saveProfileData(currentProfile, { selected: selectedSerials });
+    }
   }, [selectedSerials]);
 
   useEffect(() => {
@@ -247,11 +282,87 @@ export default function App() {
   };
 
   const handleClearAll = () => {
-    if (window.confirm("Are you sure you want to delete all bonds from your portfolio?")) {
+    if (window.confirm(`Are you sure you want to delete all bonds from this profile ("${currentProfile}")?`)) {
       setBonds([]);
       setSelectedSerials([]);
-      showNotification('info', 'Portfolio cleared. Use manual entry or upload a file to begin.');
+      showNotification('info', `Profile "${currentProfile}" cleared. Use manual entry or upload a file to begin.`);
     }
+  };
+
+  // --- Profile Management Handlers ---
+  const handleSwitchProfile = (name: string) => {
+    if (name === currentProfile) return;
+    // Flush any in-memory edits to the *current* profile before swapping.
+    saveProfileData(currentProfile, { bonds, selected: selectedSerials });
+    setActiveProfileName(name);
+    setCurrentProfile(name);
+  };
+
+  const handleCreateProfile = (rawName: string) => {
+    const trimmed = rawName.trim();
+    if (!trimmed) return;
+    if (profileNameExists(trimmed)) {
+      showNotification('error', `A profile named "${trimmed}" already exists.`);
+      return;
+    }
+    // Flush current profile's data before switching into the empty new one.
+    saveProfileData(currentProfile, { bonds, selected: selectedSerials });
+    saveProfiles([
+      ...listProfiles(),
+      {name: trimmed, createdAt: new Date().toISOString()},
+    ]);
+    setActiveProfileName(trimmed);
+    setCurrentProfile(trimmed);
+    setNewProfileName('');
+    showNotification('success', `Created and switched to profile "${trimmed}".`);
+  };
+
+  const handleRenameProfile = (oldName: string, rawNewName: string) => {
+    const trimmed = rawNewName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    if (profileNameExists(trimmed)) {
+      showNotification('error', `A profile named "${trimmed}" already exists.`);
+      return;
+    }
+    // Flush in-memory edits on the active profile before moving its
+    // storage around. Mirrors the explicit flush in handleSwitchProfile
+    // / handleCreateProfile — without this, a user who toggled a
+    // checkbox and immediately renamed the active profile would have
+    // that toggle silently overwritten by the stale localStorage value.
+    if (currentProfile === oldName) {
+      saveProfileData(oldName, { bonds, selected: selectedSerials });
+    }
+    const data = loadProfileData(oldName);
+    saveProfileData(trimmed, data);
+    deleteProfileData(oldName);
+    saveProfiles(
+      listProfiles().map(p => (p.name === oldName ? {...p, name: trimmed} : p)),
+    );
+    if (currentProfile === oldName) {
+      setActiveProfileName(trimmed);
+      setCurrentProfile(trimmed);
+    }
+    showNotification('success', `Renamed profile "${oldName}" to "${trimmed}".`);
+  };
+
+  const handleDeleteProfile = (name: string) => {
+    const liveProfiles = listProfiles();
+    if (liveProfiles.length <= 1) {
+      showNotification('error', 'Cannot delete the last remaining profile.');
+      return;
+    }
+    if (!window.confirm(`Delete profile "${name}"? All of its bonds and tax selections will be permanently removed from this device.`)) {
+      return;
+    }
+    deleteProfileData(name);
+    const remaining = liveProfiles.filter(p => p.name !== name);
+    saveProfiles(remaining);
+    if (currentProfile === name) {
+      const next = remaining[0].name;
+      setActiveProfileName(next);
+      setCurrentProfile(next);
+    }
+    showNotification('info', `Profile "${name}" deleted.`);
   };
 
   // --- Selection Handlers ---
@@ -548,7 +659,7 @@ export default function App() {
       
       {/* Top Banner Notifications */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm transition-all animate-bounce max-w-md ${
+        <div className={`fixed top-4 right-4 z-[60] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm transition-all animate-bounce max-w-md ${
           notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-200' :
           notification.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950 dark:border-rose-800 dark:text-rose-200' :
           'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-200'
@@ -558,6 +669,110 @@ export default function App() {
           <button onClick={() => setNotification(null)} className="ml-auto hover:opacity-75">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Profile Manager Modal */}
+      {profileModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          onClick={() => setProfileModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display font-bold text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Users className="w-5 h-5 text-amber-500" />
+                Manage Profiles
+              </h3>
+              <button
+                onClick={() => setProfileModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+              Each profile keeps its own bonds, selections, and notes on this
+              device. Useful when several people share a browser — for example,
+              partners, kids, or a side business. Profiles are stored locally in
+              your browser only.
+            </p>
+
+            {/* Profile list */}
+            <div className="space-y-1.5 mb-4 max-h-64 overflow-y-auto">
+              {listProfiles().map((p) => {
+                const isActive = p.name === currentProfile;
+                return (
+                  <div
+                    key={p.name}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors ${
+                      isActive
+                        ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <button
+                      onClick={() => handleSwitchProfile(p.name)}
+                      disabled={isActive}
+                      className="flex-1 text-left text-sm font-medium text-slate-800 dark:text-slate-100 disabled:cursor-default cursor-pointer"
+                    >
+                      {isActive && <span className="text-amber-500">✓ </span>}
+                      {p.name}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const next = window.prompt(`Rename profile "${p.name}" to:`, p.name);
+                        if (next && next.trim() && next.trim() !== p.name) {
+                          handleRenameProfile(p.name, next);
+                        }
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-amber-500 rounded"
+                      title="Rename profile"
+                      aria-label={`Rename ${p.name}`}
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProfile(p.name)}
+                      className="p-1.5 text-slate-400 hover:text-rose-500 rounded"
+                      title="Delete profile (and its bonds)"
+                      aria-label={`Delete ${p.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add new profile */}
+            <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <input
+                type="text"
+                value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                placeholder="New profile name…"
+                className="flex-1 text-sm p-2 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newProfileName.trim()) {
+                    handleCreateProfile(newProfileName);
+                  }
+                }}
+              />
+              <button
+                onClick={() => handleCreateProfile(newProfileName)}
+                disabled={!newProfileName.trim()}
+                className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -582,9 +797,19 @@ export default function App() {
 
           {/* Right Global Actions */}
           <div className="flex flex-wrap items-center gap-2">
-            
+
+            {/* Active Profile Indicator (opens profile manager) */}
+            <button
+              onClick={() => setProfileModalOpen(true)}
+              title={`Active profile: ${currentProfile} — click to manage profiles`}
+              className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium flex items-center gap-2 border border-slate-600 text-white transition-all shadow-sm cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-amber-500" />
+              <span className="max-w-[140px] truncate">{currentProfile}</span>
+            </button>
+
             {/* Quick Sample Refresher */}
-            <button 
+            <button
               onClick={handleLoadSample}
               title="Reset Portfolio to Sample Bonds (53 Bonds)"
               className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium flex items-center gap-2 border border-slate-600 text-white transition-all shadow-sm cursor-pointer"
