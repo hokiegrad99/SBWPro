@@ -1,22 +1,25 @@
-name: Deploy to GitHub Pages
+name: Build and Deploy
 
 on:
   push:
-    branches: [main]
+    # Listen on both common default-branch conventions so this workflow
+    # fires regardless of whether the repo's default branch is `main`
+    # or `master`.
+    branches: [main, master]
   workflow_dispatch:
 
-# Cancel any in-progress deploy when a new commit lands, and serialize them
-# so simultaneous pushes don't fight for the same Pages slot.
+# Serialize deploys so simultaneous pushes don't race-write the
+# gh-pages branch tip. cancel-in-progress: false queues newer runs
+# behind older ones — safest for force_orphan rebases.
 concurrency:
   group: pages
   cancel-in-progress: false
 
-# Least-privilege permissions required by the official GitHub Pages deploy
-# action: pages:write to publish, id-token:write for OIDC auth.
+# peaceiris/actions-gh-pages needs `contents: write` to push the built
+# site into the `gh-pages` branch on every run. (It's idempotent: each
+# run overwrites the branch's previous contents.)
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
   build:
@@ -41,30 +44,16 @@ jobs:
       - name: Build for production
         run: npm run build
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+      - name: Publish dist/ to the gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          # Auto-enable Pages if it isn't already, and ensure the build
-          # source is set to GitHub Actions. This is the documented fix for
-          # the "Get Pages site failed... Error: Not Found" error that
-          # appears on a brand-new repository whose Pages flag has never
-          # been initialized.
-          # Docs: https://github.com/actions/configure-pages
-          enablement: 'true'
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-  deploy:
-    name: Deploy
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The contents of dist/ are written to the root of gh-pages.
+          # Vite's `base: '/SBWPro/'` ensures every asset URL emitted in
+          # dist/index.html resolves correctly when Pages serves the
+          # site from the gh-pages branch at /SBWPro/.
+          publish_dir: ./dist
+          # Force-push overwrites the previous build atomically. Keeps
+          # the gh-pages branch lean (one commit per deploy) instead of
+          # accumulating history.
+          force_orphan: true

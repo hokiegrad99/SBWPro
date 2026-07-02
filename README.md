@@ -56,31 +56,34 @@ npm run preview
 
 This repo is pre-configured for GitHub Pages at **`https://(your-username).github.io/SBWPro/`** — the `base` path in `vite.config.ts` is set to `/SBWPro/` to match the repository name.
 
+### How the deploy works
+
+A workflow defined at [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) builds the project on every push to `main` (or `master`) and publishes the contents of `dist/` to a dedicated **`gh-pages` branch** using [`peaceiris/actions-gh-pages@v4`](https://github.com/peaceiris/actions-gh-pages). GitHub Pages then statically serves that branch.
+
+This pattern is intentionally chosen over the newer `actions/deploy-pages@v4` approach because it has the simplest, most reliable UI flow on the GitHub side — **Source = "Deploy from a branch"** works every time and always shows a Save button, regardless of how GitHub detects your repo's defaults.
+
 ### One-time setup
 
-The workflow at [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) automatically enables GitHub Pages for you (via the `enablement: 'true'` input on `actions/configure-pages@v5`), so in most cases you don't need to touch any settings yourself — just push to `main` and the site will appear at your Pages URL within a minute.
+1. **Push to `main` (or `master`) once** to let the workflow run and create the `gh-pages` branch. (Until you've done this, the branch won't exist yet, so step 2 will have nothing to point at.)
+2. **Settings → Pages → Build and deployment → Source**: choose **"Deploy from a branch"**.
+3. In the Branch dropdown: pick **`gh-pages`** and **`/ (root)`**.
+4. Click **Save** — this is the Save button you found earlier. Once the page refreshes, you'll see your site URL at the top: `https://(your-username).github.io/SBWPro/`.
 
-> **If the very first deploy fails with `Get Pages site failed... Error: Not Found`:**
-> that means GitHub hasn't initialized the Pages resource for the repository yet. Open **Settings → Pages**, pick **GitHub Actions** as the build source (you don't need to commit anything), then push again. On every subsequent run the workflow handles enablement itself.
+The first deploy usually takes 30–60 seconds after the workflow run completes (Pages polls for changes on the `gh-pages` branch).
 
-_(Optional but recommended)_ Confirm that the repository visibility is **Public** so Pages can serve it.
+### Every push to `main` / `master`
 
-### Every push to `main`
+The workflow automatically:
 
-A workflow defined at [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) takes care of everything:
-
-1. Checks out the repository.
-2. Sets up Node.js 20 with the npm cache primed.
-3. Runs `npm ci` for a clean, reproducible install from `package-lock.json`.
-4. Runs `npm run lint` to type-check the TypeScript sources.
-5. Runs `npm run build` to produce the static `dist/` folder.
-6. Uploads the artifact and publishes it to GitHub Pages via the official `actions/deploy-pages` action.
-
-The site will go live within ~60 seconds of every commit to `main`. The action creates a `github-pages` deployment environment so each release shows up under the **Environments** tab with its URL.
+1. Checks out the repo and installs Node 20 (with npm cache).
+2. Runs `npm ci` for a clean, reproducible install from `package-lock.json`.
+3. Runs `npm run lint` to type-check the TypeScript sources.
+4. Runs `npm run build` to produce the static `dist/` folder.
+5. Force-overwrites the `gh-pages` branch with the `dist/` contents (one commit per deploy, no historical cruft).
 
 ### Manual deploys
 
-You can also trigger a deploy from the **Actions → Deploy to GitHub Pages → Run workflow** button on any branch — useful for previewing a PR's build before merging.
+You can also trigger a deploy from the **Actions → Build and Deploy → Run workflow** button on any branch — useful for previewing a PR's build before merging.
 
 ### ⚙️ Publishing from a different repo name?
 
