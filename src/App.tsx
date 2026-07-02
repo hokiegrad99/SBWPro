@@ -343,7 +343,7 @@ export default function App() {
     if (window.confirm("Replace current portfolio with the original US Treasury sample portfolio?")) {
       setBonds(SAMPLE_BONDS);
       setSelectedSerials([]);
-      showNotification('success', 'Loaded 53 sample bonds matching the US Treasury calculator!');
+      showNotification('success', `Loaded ${SAMPLE_BONDS.length} sample bonds matching the US Treasury calculator!`);
     }
   };
 
@@ -896,7 +896,7 @@ export default function App() {
             {/* Quick Sample Refresher */}
             <button
               onClick={handleLoadSample}
-              title="Reset Portfolio to Sample Bonds (53 Bonds)"
+              title={`Reset Portfolio to Sample Bonds (${SAMPLE_BONDS.length} Bonds)`}
               className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm font-medium flex items-center gap-2 border border-slate-600 text-white transition-all shadow-sm cursor-pointer"
             >
               <RefreshCw className="w-4 h-4 text-amber-500" />
@@ -1898,7 +1898,7 @@ export default function App() {
                                     Explore with samples
                                   </h5>
                                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-                                    Try 53 example bonds matching the official
+                                    Try {SAMPLE_BONDS.length} example bonds matching the official
                                     Treasury calculator output.
                                   </p>
                                   <button
