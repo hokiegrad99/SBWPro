@@ -126,15 +126,70 @@ The repository also contains a `.gitignore` that excludes `node_modules/`, `dist
 
 ---
 
-## 🧾 Importing from the U.S. Treasury Savings Bond Calculator
+## 📚 User Guide — Getting started
 
-1. Visit the official [Treasury Savings Bond Calculator](https://www.savingsbonds.gov/sb/calc.htm).
-2. Enter your bonds and click **Calculate**.
-3. In your browser, choose **File → Save Page As…** and save the result as **`.html`** (not `.htm`).
-4. Open **Savings Bond Wizard Pro**, drop the saved file onto the import area in the sidebar.
-   (It can also be a `.csv` you exported from this app or any spreadsheet with the same column layout.)
+When you open the app for the first time, your portfolio starts **empty** — no sample bonds are preloaded. You pick how the inventory begins. There are three ways:
 
-Duplicates are detected automatically by serial number and skipped.
+### Option A — Import your real bonds from TreasuryDirect (recommended)
+
+The fastest path: drop a saved HTML report from the official calculator straight into the import area. Step by step:
+
+1. **Open the [TreasuryDirect Savings Bond Calculator](https://www.treasurydirect.gov/BC/SBCPrice)** in a new tab.
+   - Sign in to your TreasuryDirect account (recommended — it fills in the bonds you own automatically).
+   - Or, if you don't have an account, click **“Calculate”** in the **“Don't have a TreasuryDirect account?”** section at the very bottom of that page and enter each bond by hand. You'll need each bond's:
+     - **Serial number** (printed on the paper bond)
+     - **Denomination** (e.g. $50, $100, $500)
+     - **Issue date** (Month / Year)
+2. Click **Calculate.** The page displays your portfolio with current cash values and a 30-year final-maturity date for each bond.
+3. **Save the page to your computer.** Keyboard shortcut: **Ctrl+S** (Windows / Linux) or **Cmd+S** (Mac). When your browser asks which format:
+   - **Chrome / Edge:** choose *“Webpage, HTML Only.”* (Filename should end in `.html`.)
+   - **Firefox:** choose *“Webpage, Complete.”* (Filename may end in `.html` or `.htm`.)
+   - **Safari:** File → Save As, then change **Format** to *Page Source.*
+
+   > ❌ Don't pick “Webpage, Single File” (`.mhtml`), “Web Archive” (`.webarchive`), or “PDF” — those formats won't parse.
+4. **Back in Savings Bond Wizard Pro**, find the **“Drop files here or click to browse”** drop zone in the right sidebar (under *Import & Export Inventory*).
+5. **Drag the saved file** onto that drop zone (or click to browse to it). The app will parse your bonds in under a second and populate the table.
+6. **You're done.** You can now:
+   - See your portfolio's total face value, accrued interest, average coupon rate, and the matured-bond warning at the top.
+   - Click the pencil icon on any row to add a note (e.g. “Gift from Grandma”).
+   - Check the gray square at the left of each bond to mark it for cash-out, then read the *Federal Tax Estimator* panel to see interest subject to tax, tax due, and net proceeds.
+   - **Re-import later** when values have updated — duplicates (matched by serial number) are skipped automatically, so it's safe to drop in a fresh report anytime. **You never need to clear your portfolio first.**
+
+### Option B — Add bonds manually
+
+Click the amber **“New Bond Entry +”** button just above the bonds table. For each bond, fill in:
+
+| Field          | Example                            |
+| -------------- | ---------------------------------- |
+| Series         | `I` (inflation-linked) or `EE`     |
+| Serial number  | `C12345678EI`                      |
+| Denomination   | `$50`, `$100`, `$500`, `$1,000`…   |
+| Issue date     | `07/2010` (MM/YYYY)                |
+| Interest rate  | `3.5` (percent)                    |
+| Current value  | Auto-estimated — leave blank to use the heuristic |
+| Note           | *(optional)* “Birthday 2020”, “Inherited”, etc. |
+
+Click **Save Bond** to add it. Use this option if you have only one or two bonds or want to fill in any field manually that the TreasuryDirect report missed.
+
+### Option C — Explore with the sample portfolio
+
+Click **“Load Sample”** in the page header to populate a 53-bond portfolio that mirrors the official Treasury calculator's example output. Use this to:
+- See the dashboard and tax estimator without entering any real data.
+- Verify that page totals and tax math match what the Treasury site would show.
+- Hand off a known shape to anyone who wants to test against it.
+
+The sample is destructive — it replaces your current portfolio (with a confirmation dialog).
+
+### CSV import (advanced)
+
+If you maintain your bonds in a spreadsheet, export it as CSV with these columns (first row may be a header):
+
+```
+serial, series, denomination, issueDate, finalMaturity,
+issuePrice, interest, interestRate, value, nextAccrual, note
+```
+
+Then drop the `.csv` onto the same import area. Duplicates (matched by serial number) are skipped.
 
 ---
 

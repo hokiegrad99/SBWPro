@@ -116,7 +116,6 @@ export function deleteProfileData(name: string): void {
  */
 export function ensureProfilesInitialized(
   defaultName: string,
-  defaultBonds: Bond[],
 ): void {
   const existing = listProfiles();
   if (existing.length === 0) {
@@ -125,7 +124,11 @@ export function ensureProfilesInitialized(
       createdAt: new Date().toISOString(),
     };
     saveProfiles([fallback]);
-    saveProfileData(defaultName, {bonds: defaultBonds, selected: []});
+    // Note: no portfolio data is seeded. New profiles intentionally
+    // start empty so first-time visitors see a clean slate and choose
+    // between TreasuryDirect import, manual entry, or the sample
+    // portfolio — instead of having unrelated sample data appear
+    // out of nowhere.
   }
   const active = getActiveProfileName();
   if (!active || !existing.some(p => p.name === active)) {

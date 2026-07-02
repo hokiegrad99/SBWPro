@@ -21,10 +21,10 @@ export const SAMPLE_BONDS: Bond[] = [
     issueDate: "09/2010",
     nextAccrual: "08/2026",
     finalMaturity: "09/2040",
-    issuePrice: 100.00,
+    issuePrice: 50.00,
     interest: 24.72,
     interestRate: 1.40,
-    value: 124.72,
+    value: 74.72,
     note: ""
   },
   {
@@ -47,10 +47,10 @@ export const SAMPLE_BONDS: Bond[] = [
     issueDate: "07/2010",
     nextAccrual: "08/2026",
     finalMaturity: "07/2040",
-    issuePrice: 500.00,
+    issuePrice: 250.00,
     interest: 25.04,
     interestRate: 1.40,
-    value: 25.04,
+    value: 275.04,
     note: ""
   },
   {

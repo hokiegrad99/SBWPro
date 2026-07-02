@@ -27,6 +27,7 @@ import {
   BookOpen,
   ArrowRightLeft,
   Users,
+  Sparkles,
 } from 'lucide-react';
 import { Bond, SortField, SortDirection } from './types';
 import { SAMPLE_BONDS } from './data/sampleBonds';
@@ -50,6 +51,10 @@ import {
   profileNameExists,
   ProfileMeta,
 } from './utils/profiles';
+import {
+  TREASURY_CALCULATOR_URL,
+  TREASURY_CALCULATOR_HELP_URL,
+} from './utils/treasuryLinks';
 
 const DEFAULT_PROFILE_NAME = 'Default';
 
@@ -59,17 +64,53 @@ export default function App() {
   // initialization before any profile data is read. Both are idempotent.
   const [currentProfile, setCurrentProfile] = useState<string>(() => {
     migrateLegacyData(DEFAULT_PROFILE_NAME);
-    ensureProfilesInitialized(DEFAULT_PROFILE_NAME, SAMPLE_BONDS);
+    ensureProfilesInitialized(DEFAULT_PROFILE_NAME);
     return getActiveProfileName() ?? DEFAULT_PROFILE_NAME;
   });
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
 
+  // First-run onboarding: shows a small banner + pulse highlight over the
+  // import drop zone until the user has imported any bond, loaded the
+  // sample, added a bond manually, or explicitly clicked "Got it".
+  // Persisted in localStorage so the tip is truly one-time-per-device.
+  const [firstRunTooltipDismissed, setFirstRunTooltipDismissed] = useState<boolean>(
+    () => localStorage.getItem('sbw.first_run_tooltip_dismissed') === 'true',
+  );
+  const dismissFirstRunTooltip = () => {
+    localStorage.setItem('sbw.first_run_tooltip_dismissed', 'true');
+    setFirstRunTooltipDismissed(true);
+  };
+  // Snapshot the dismissal flag as of the first render. The auto-dismiss
+  // effect below uses this to skip the redundant localStorage write for
+  // returning users whose tooltip was already dismissed on a previous
+  // visit. (React refs survive the mount lifetime but don't reset on
+  // re-render, so the value is fixed for the whole session.)
+  const mountedAlreadyDismissedRef = useRef(firstRunTooltipDismissed);
+
+  // Profile-onboarding: same one-time-per-device pattern as the
+  // import-dropzone tooltip — points at the profile button in the
+  // header until the user opens the manager modal for the first time.
+  const [profileTooltipDismissed, setProfileTooltipDismissed] = useState<boolean>(
+    () => localStorage.getItem('sbw.profile_tooltip_dismissed') === 'true',
+  );
+  const dismissProfileTooltip = () => {
+    // Idempotent: bail out for returning users (or in-session re-opens)
+    // whose flag is already set, so we don't redundantly rewrite
+    // localStorage on every modal open.
+    if (localStorage.getItem('sbw.profile_tooltip_dismissed') === 'true') return;
+    localStorage.setItem('sbw.profile_tooltip_dismissed', 'true');
+    setProfileTooltipDismissed(true);
+  };
+  const mountedAlreadyProfileDismissedRef = useRef(profileTooltipDismissed);
+
   const [bonds, setBonds] = useState<Bond[]>(() => {
     const profile = getActiveProfileName() ?? DEFAULT_PROFILE_NAME;
-    const data = loadProfileData(profile);
-    return data.bonds.length > 0 ? data.bonds : SAMPLE_BONDS;
+    // First-time visitors read an EMPTY portfolio here — the welcome
+    // card below in the table takes over and offers three explicit
+    // ways to populate the inventory (import / add / load sample).
+    return loadProfileData(profile).bonds;
   });
 
   const [selectedSerials, setSelectedSerials] = useState<string[]>(() => {
@@ -89,6 +130,31 @@ export default function App() {
     // fire only when the *profile* changes, not every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProfile]);
+
+  // Auto-dismiss the first-run onboarding tip the moment the portfolio
+  // has any bonds in it — covers import, manual add, load sample, and
+  // switching into a profile that already had data. Idempotent.
+  useEffect(() => {
+    // Skip the redundant localStorage.setItem("true") for returning
+    // users who already dismissed the tip on a previous visit.
+    if (mountedAlreadyDismissedRef.current) return;
+    if (bonds.length > 0) {
+      dismissFirstRunTooltip();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bonds]);
+
+  // Auto-dismiss the profile-onboarding tip the moment the user opens
+  // the profile manager modal for the first time.
+  useEffect(() => {
+    // Skip the redundant localStorage.setItem("true") for returning
+    // users who already dismissed the tip on a previous visit.
+    if (mountedAlreadyProfileDismissedRef.current) return;
+    if (profileModalOpen) {
+      dismissProfileTooltip();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileModalOpen]);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('bonds_wizard_dark_mode');
@@ -808,6 +874,25 @@ export default function App() {
               <span className="max-w-[140px] truncate">{currentProfile}</span>
             </button>
 
+            {/* Profile-onboarding tooltip pointing at the profile button */}
+            {!profileTooltipDismissed && (
+              <div
+                role="status"
+                className="flex items-center gap-1.5 bg-amber-400 dark:bg-amber-500 text-slate-900 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md whitespace-nowrap"
+                title="Click the user-icon button to manage multiple profiles"
+              >
+                <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Click here to manage multiple profiles</span>
+                <button
+                  onClick={dismissProfileTooltip}
+                  className="ml-0.5 text-slate-900/70 hover:text-slate-900 flex-shrink-0 cursor-pointer"
+                  aria-label="Dismiss profile tooltip"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Quick Sample Refresher */}
             <button
               onClick={handleLoadSample}
@@ -1161,8 +1246,42 @@ export default function App() {
                 </h2>
               </div>
 
+              {/* First-run onboarding tooltip pointing at the drop zone */}
+              {!firstRunTooltipDismissed && bonds.length === 0 && (
+                <div role="status" className="mb-3 px-3 py-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 rounded-lg flex items-start justify-between gap-2 text-xs text-amber-900 dark:text-amber-200 shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                    <div>
+                      <strong className="block text-[11px] uppercase tracking-wider font-bold">
+                        First time here?
+                      </strong>
+                      <span>
+                        Drop an HTML save from{' '}
+                        <a
+                          href={TREASURY_CALCULATOR_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline font-mono font-bold text-blue-700 dark:text-blue-400"
+                        >
+                          TreasuryDirect
+                        </a>{' '}
+                        into the box below — or click the box to browse.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={dismissFirstRunTooltip}
+                    className="text-amber-700 dark:text-amber-300 hover:opacity-70 flex-shrink-0 cursor-pointer"
+                    aria-label="Dismiss first-run tooltip"
+                    title="Got it"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               {/* HTML drag and drop workspace */}
-              <div 
+              <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -1170,7 +1289,9 @@ export default function App() {
                 className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
                   isDragging 
                     ? 'border-emerald-500 bg-emerald-500/10' 
-                    : 'border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                    : !firstRunTooltipDismissed && bonds.length === 0
+                      ? 'border-amber-400 dark:border-amber-500 ring-4 ring-amber-400/40 dark:ring-amber-500/30 animate-pulse-subtle bg-amber-50/30 dark:bg-amber-950/10'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 }`}
               >
                 <input 
@@ -1728,22 +1849,73 @@ export default function App() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={12} className="py-12 text-center text-slate-400 font-sans">
-                          <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                          <h4 className="font-semibold text-slate-700 dark:text-slate-300">No Savings Bonds Found</h4>
-                          <p className="text-xs mt-1">
-                            {bonds.length === 0 
-                              ? "Your portfolio is empty. Click 'New Bond Entry +' or import an inventory file to get started." 
-                              : "No bonds match your active search filter criteria."}
-                          </p>
-                          {bonds.length === 0 && (
-                            <button
-                              onClick={() => setBonds(SAMPLE_BONDS)}
-                              className="mt-4 px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded shadow-sm transition-all inline-flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              Load US Treasury Sample Portfolio
-                            </button>
+                        <td colSpan={12} className="py-8 px-6 text-slate-500 font-sans">
+                          {bonds.length === 0 ? (
+                            <div className="max-w-3xl mx-auto bg-gradient-to-br from-slate-50 to-amber-50/40 dark:from-slate-900/60 dark:to-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl p-8">
+                              <div className="text-center mb-6">
+                                <Coins className="w-10 h-10 mx-auto mb-3 text-amber-500" />
+                                <h4 className="font-display font-bold text-xl text-slate-800 dark:text-slate-100 mb-2">
+                                  Your portfolio is empty
+                                </h4>
+                                <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto">
+                                  Pick a starting option below. The app will not load
+                                  sample data behind your back — you choose how it
+                                  begins.
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
+                                  <BookOpen className="w-5 h-5 text-amber-500 mb-2" />
+                                  <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+                                    Import from TreasuryDirect
+                                  </h5>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                                    Save an HTML report from the official calculator
+                                    and drop it on the import area in the sidebar.
+                                  </p>
+                                  <a
+                                    href={TREASURY_CALCULATOR_URL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-bold"
+                                  >
+                                    Open calculator →
+                                  </a>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
+                                  <Plus className="w-5 h-5 text-emerald-500 mb-2" />
+                                  <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+                                    Add one manually
+                                  </h5>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                                    Use the amber “New Bond Entry +” button above
+                                    to enter a single bond.
+                                  </p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
+                                  <RefreshCw className="w-5 h-5 text-indigo-500 mb-2" />
+                                  <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+                                    Explore with samples
+                                  </h5>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                                    Try 53 example bonds matching the official
+                                    Treasury calculator output.
+                                  </p>
+                                  <button
+                                    onClick={handleLoadSample}
+                                    className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-bold cursor-pointer"
+                                  >
+                                    Load sample portfolio →
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                              <h4 className="font-semibold text-slate-700 dark:text-slate-300">No Savings Bonds Found</h4>
+                              <p className="text-xs mt-1">No bonds match your active search filter criteria.</p>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -1817,6 +1989,25 @@ export default function App() {
                   <strong>Accrual Notes:</strong> Interest is compiled monthly and added to the principal balance semi-annually. If you redeem a bond within the first 5 years of ownership, you lose the most recent 3 months of interest. After 5 years, there is zero penalty.
                 </p>
               </div>
+
+              {/* External help link to the official TreasuryDirect calculator instructions */}
+              <div className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                <HelpCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p>
+                  For step-by-step instructions on entering your bonds into the official calculator, see the{' '}
+                  <a
+                    href={TREASURY_CALCULATOR_HELP_URL}
+
+                    aria-label="TreasuryDirect Savings Bond Calculator instructions (opens in new tab)"                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline font-bold"
+                  >
+                    TreasuryDirect Savings Bond Calculator instructions ↗
+                  </a>
+                  .
+                </p>
+              </div>
+            
             </section>
 
           </div>
