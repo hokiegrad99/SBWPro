@@ -1,6 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+/*
+ * Tell Tailwind v4 to fire `dark:` utilities when the `.dark` class is
+ * present on <html> (or any ancestor). Without this declaration, Tailwind
+ * defaults to `prefers-color-scheme` (operating-system level), which means
+ * adding/removing the `dark` class programmatically via React / localStorage
+ * has no effect on `dark:bg-...` / `dark:text-...` rules.
+ * Docs: https://tailwindcss.com/docs/dark-mode#toggling-dark-mode-manually
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
