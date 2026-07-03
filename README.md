@@ -1,6 +1,6 @@
 # Savings Bond Wizard Pro
 
-A free, browser-based portfolio manager for **U.S. Treasury I & EE Savings Bonds**.
+A free, browser-based portfolio manager for **U.S. Treasury I & EE Savings Bonds** *(paper bonds only)*.
 
 Track your paper-bond inventory, model cash-out scenarios, estimate the federal tax you may owe on accrued interest, and import or export the official U.S. Treasury inventory format — all without sending a single byte of your data to a server.
 
@@ -11,6 +11,7 @@ _(after enabling GitHub Pages — see deployment below)_
 
 ## ✨ Features
 
+- 📄 **Paper bonds only** — the app tracks **paper** U.S. Treasury I & EE Savings Bonds (the ones you hold physically). Delete this qualifier once electronic-bond support lands.
 - 📊 **Portfolio dashboard** — face value, accrued interest, average coupon rate, and a Series I vs. EE breakdown.
 - 🧮 **Federal tax estimator** — pick your marginal bracket, select bonds you plan to cash out, and instantly see taxable interest, tax due, and net proceeds (with a higher-education exclusion toggle).
 - 📥 **Import** from the official U.S. Treasury Savings Bond Calculator HTML file or a generic CSV inventory.
@@ -117,7 +118,7 @@ If you intend to publish at a custom user/organization root (`https://(user).git
     ├── index.css           # Tailwind CSS v4 entry
     ├── types.ts            # Shared TypeScript types
     ├── data/
-    │   └── sampleBonds.ts  # 53-bond sample portfolio matching the Treasury calculator
+    │   └── sampleBonds.ts  # the bundled sample portfolio
     └── utils/
         └── bondParser.ts   # HTML/CSV parser & generator for Treasury imports
 ```
@@ -173,7 +174,7 @@ Click **Save Bond** to add it. Use this option if you have only one or two bonds
 
 ### Option C — Explore with the sample portfolio
 
-Click **“Load Sample”** in the page header to populate a 53-bond portfolio that mirrors the official Treasury calculator's example output. Use this to:
+Click **“Load Sample”** in the page header to populate the bundled sample portfolio defined in `src/data/sampleBonds.ts` (mirrors the official Treasury calculator's example output. Use this to:
 - See the dashboard and tax estimator without entering any real data.
 - Verify that page totals and tax math match what the Treasury site would show.
 - Hand off a known shape to anyone who wants to test against it.

@@ -36,8 +36,12 @@ import {
   generateTreasuryHTML,
   parseBondsFromCSV,
   generateCSV,
-  isBondMatured
+  isBondMatured,
+  CURRENT_REFERENCE_DATE,
 } from './utils/bondParser';
+
+const REF_YEAR = CURRENT_REFERENCE_DATE.year;
+const REF_MONTH = CURRENT_REFERENCE_DATE.month;
 import {
   ensureProfilesInitialized,
   migrateLegacyData,
@@ -51,6 +55,7 @@ import {
   profileNameExists,
   ProfileMeta,
 } from './utils/profiles';
+import { APP_TAGLINE } from './utils/copy';
 import {
   TREASURY_CALCULATOR_URL,
   TREASURY_CALCULATOR_HELP_URL,
@@ -268,9 +273,12 @@ export default function App() {
     // Proactive approximation of current value based on issue date
     // Simple logic: add a baseline interest for UI friendliness
     const months = parseDateToMonths(formIssueDate);
-    const currentMonths = parseDateToMonths("07/2026");
+    // Reference "today" is the same `CURRENT_REFERENCE_DATE` the
+    // maturity dashboard uses, so this preview stays in lockstep with
+    // the rest of the app rather than drifting at month rollover.
+    const currentMonths = REF_YEAR * 12 + (REF_MONTH - 1);
     const ageInYears = Math.max(0, (currentMonths - months) / 12);
-    
+
     // Estimate simple accrued interest at formInterestRate
     const estimatedValue = computedIssuePrice + (computedIssuePrice * (formInterestRate / 100) * ageInYears);
     setFormCurrentValue(Math.round(estimatedValue * 100) / 100);
@@ -289,7 +297,7 @@ export default function App() {
       totalCost += b.issuePrice;
       totalVal += b.value;
       totalInt += b.interest;
-      if (isBondMatured(b.finalMaturity, 2026, 7)) {
+      if (isBondMatured(b.finalMaturity, REF_YEAR, REF_MONTH)) {
         maturedCount++;
       }
     });
@@ -476,6 +484,25 @@ export default function App() {
       return;
     }
 
+    // Numeric bounds (the visible form inputs use `min`/`max` HTML
+    // attributes, but those can be bypassed by browser devtools, paste,
+    // or older browsers — so enforce here too). `Number.isFinite`
+    // guards `NaN` because `NaN < 0` is `false` and `NaN > 100` is
+    // `false`, so without the finiteness check a non-finite value
+    // would slip past the range tests.
+    if (!Number.isFinite(formInterestRate) || formInterestRate < 0 || formInterestRate > 100) {
+      setFormError('Interest rate must be a number between 0% and 100%.');
+      return;
+    }
+    if (!Number.isFinite(formCurrentValue) || formCurrentValue < 0) {
+      setFormError('Current value must be a non-negative number.');
+      return;
+    }
+    if (!Number.isFinite(computedIssuePrice) || computedIssuePrice <= 0) {
+      setFormError('Denomination must result in a positive issue price.');
+      return;
+    }
+
     // Date formatting check (MM/YYYY)
     const dateRegex = /^(0[1-9]|1[0-2])\/\d{4}$/;
     if (!dateRegex.test(formIssueDate.trim())) {
@@ -648,7 +675,7 @@ export default function App() {
         const matchesSeries = filterSeries === 'All' || b.series === filterSeries;
 
         // Status filter (Matured = >30 years / past Final Maturity)
-        const isMatured = isBondMatured(b.finalMaturity, 2026, 7);
+        const isMatured = isBondMatured(b.finalMaturity, REF_YEAR, REF_MONTH);
         const matchesStatus = filterStatus === 'All' || 
           (filterStatus === 'Matured' && isMatured) || 
           (filterStatus === 'Active' && !isMatured);
@@ -699,7 +726,7 @@ export default function App() {
     let activeVal = 0;
 
     bonds.forEach(b => {
-      const isMatured = isBondMatured(b.finalMaturity, 2026, 7);
+      const isMatured = isBondMatured(b.finalMaturity, REF_YEAR, REF_MONTH);
       if (b.series === 'I') seriesIVal += b.value;
       else seriesEEVal += b.value;
 
@@ -856,7 +883,7 @@ export default function App() {
                 Savings Bond Wizard <span className="text-amber-500">Pro</span>
               </h1>
               <p className="text-xs text-slate-400 font-sans">
-                US Treasury Portfolio Management Utility
+                {APP_TAGLINE}
               </p>
             </div>
           </div>
@@ -1528,9 +1555,11 @@ export default function App() {
                     {/* Interest Rate */}
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Interest Rate (%)</label>
-                      <input 
+                      <input
                         type="number"
                         step="0.01"
+                        min={0}
+                        max={100}
                         value={formInterestRate}
                         onChange={(e) => setFormInterestRate(parseFloat(e.target.value) || 0)}
                         required
@@ -1541,9 +1570,10 @@ export default function App() {
                     {/* Current Value */}
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current Value ($)</label>
-                      <input 
+                      <input
                         type="number"
                         step="0.01"
+                        min={0}
                         value={formCurrentValue}
                         onChange={(e) => setFormCurrentValue(parseFloat(e.target.value) || 0)}
                         required
@@ -1700,7 +1730,7 @@ export default function App() {
                     {sortedAndFilteredBonds.length > 0 ? (
                       sortedAndFilteredBonds.map(b => {
                         const isSelected = selectedSerials.includes(b.serial);
-                        const isMatured = isBondMatured(b.finalMaturity, 2026, 7);
+                        const isMatured = isBondMatured(b.finalMaturity, REF_YEAR, REF_MONTH);
 
                         return (
                           <tr 

