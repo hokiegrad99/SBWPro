@@ -28,6 +28,8 @@ import {
   ArrowRightLeft,
   Users,
   Sparkles,
+  ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { Bond, SortField, SortDirection } from './types';
 import { SAMPLE_BONDS } from './data/sampleBonds';
@@ -109,6 +111,19 @@ export default function App() {
     setProfileTooltipDismissed(true);
   };
   const mountedAlreadyProfileDismissedRef = useRef(profileTooltipDismissed);
+
+  // Privacy notice: slim banner pinned near the top of the page on
+  // first load that reassures users everything is processed locally
+  // on their device. Dismiss is sticky in localStorage so returning
+  // visitors never see it again. Persistence key matches the
+  // existing `sbw.*` namespace used elsewhere in this file.
+  const [privacyBannerDismissed, setPrivacyBannerDismissed] = useState<boolean>(
+    () => localStorage.getItem('sbw.privacy_banner_dismissed') === 'true',
+  );
+  const dismissPrivacyBanner = () => {
+    localStorage.setItem('sbw.privacy_banner_dismissed', 'true');
+    setPrivacyBannerDismissed(true);
+  };
 
   const [bonds, setBonds] = useState<Bond[]>(() => {
     const profile = getActiveProfileName() ?? DEFAULT_PROFILE_NAME;
@@ -869,6 +884,42 @@ export default function App() {
         </div>
       )}
 
+      {/* Privacy Notice (local-only processing guarantee).
+          Dismissable; preference persists in localStorage so
+          returning users don't see it again. The wording deliberately
+          mentions both files and stored data so users get a clear,
+          honest picture of where their bonds live. */}
+      {!privacyBannerDismissed && (
+        <div
+          role="region"
+          aria-label="Privacy notice"
+          className="bg-emerald-700 dark:bg-emerald-900 text-emerald-50 px-4 py-2.5 text-xs sm:text-sm shadow-sm border-b border-emerald-800/50 dark:border-emerald-950/50"
+        >
+          <div className="max-w-7xl mx-auto flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <ShieldCheck
+                className="w-4 h-4 flex-shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <span>
+                <strong className="font-display font-bold uppercase tracking-wider text-[11px] mr-1.5">
+                  100% Local
+                </strong>
+                All files are processed on this device. Your bonds, notes, and profiles never leave your browser — nothing is sent to or stored on any server.
+              </span>
+            </div>
+            <button
+              onClick={dismissPrivacyBanner}
+              className="text-emerald-50/80 hover:text-white flex-shrink-0 transition-opacity"
+              aria-label="Dismiss privacy notice"
+              title="Got it"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Primary Dashboard Header */}
       <header className="sticky top-0 z-40 bg-slate-900 text-white border-b-4 border-amber-500 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -919,6 +970,26 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            {/* Privacy indicator — persistent chip near the profile
+                button. Locks the privacy guarantee into the header so
+                users who dismissed the top banner still see the
+                local-only promise. Clicking re-opens the full top
+                banner + smooth-scrolls to it for the longer-form
+                story. */}
+            <button
+              type="button"
+              onClick={() => {
+                setPrivacyBannerDismissed(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-emerald-900/40 border border-emerald-500/40 text-emerald-300 px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 whitespace-nowrap hover:bg-emerald-900/60 active:bg-emerald-900/80 transition-colors shadow-sm cursor-pointer"
+              title="Click to view the full privacy promise"
+              aria-label="Show the full privacy notice"
+            >
+              <Lock className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+              <span>Local-only</span>
+            </button>
 
             {/* Quick Sample Refresher */}
             <button

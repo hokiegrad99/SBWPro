@@ -2,6 +2,8 @@
 
 A free, browser-based portfolio manager for **U.S. Treasury I & EE Savings Bonds** *(paper bonds only)*.
 
+🔒 **100 % local & private — your bonds, notes, and profiles never leave this device.** All processing happens in your browser and everything is stored in `localStorage`. Nothing is uploaded, logged, or sent to any server — ever.
+
 Track your paper-bond inventory, model cash-out scenarios, estimate the federal tax you may owe on accrued interest, and import or export the official U.S. Treasury inventory format — all without sending a single byte of your data to a server.
 
 🌐 **Live demo:** `https://(your-username).github.io/SBWPro/`

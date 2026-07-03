@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig} from 'vitest/config';
 
 // `base` matches the GitHub Pages repo name so asset paths resolve correctly
 // when the site is served from https://<username>.github.io/SBWPro/.
@@ -13,6 +13,15 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    // Vitest shares this config file (no separate vitest.config.ts).
+    // happy-dom is lighter than jsdom and covers both DOMParser and
+    // querySelectorAll, which the parseBondsFromHTML round-trip
+    // specs need. Production `npm run build` skips test files
+    // because they are never imported by an entrypoint.
+    test: {
+      environment: 'happy-dom',
+      include: ['src/**/*.test.{ts,tsx}'],
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
