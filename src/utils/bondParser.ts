@@ -101,6 +101,145 @@ export function encodeTreasuryMonth(dateStr: string): number {
   return totalMonthIndex - 23295;
 }
 
+// ---------- Value "as of" month helpers ----------
+//
+// Every value in a bond report is a snapshot as of the redemption date
+// the user picked on the Treasury calculator (or the month of manual
+// entry / last re-import). Tracking that month lets the dashboard flag
+// portfolios that haven't been re-imported recently, instead of
+// silently presenting stale totals as current.
+
+// Zero-padded month names in Treasury column order (January first).
+// Index 0 is unused padding so MONTH_NAMES[m] is the m-th month.
+const MONTH_NAMES = [
+  '', 'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+] as const;
+
+/**
+ * The month this device considers "now" as {year, month}. Derived from
+ * the real clock by default; tests can pin a deterministic "now" by
+ * passing explicit arguments.
+ */
+export function getCurrentReferenceMonth(
+  now: Date = new Date(),
+): { year: number; month: number } {
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+/**
+ * Parses "MM/YYYY" into an absolute month count (year*12 + month-1).
+ * Returns null when the string is missing or malformed.
+ */
+export function parseMonthToMonths(monthStr: string | undefined): number | null {
+  if (!monthStr) return null;
+  const parts = monthStr.split('/');
+  if (parts.length !== 2) return null;
+  const month = parseInt(parts[0], 10);
+  const year = parseInt(parts[1], 10);
+  if (isNaN(month) || isNaN(year) || month < 1 || month > 12) return null;
+  return year * 12 + (month - 1);
+}
+
+/**
+ * Inverse of `parseMonthToMonths`: renders an absolute month count
+ * back to zero-padded "MM/YYYY".
+ */
+export function formatMonthsAsMonth(totalMonths: number): string {
+  const year = Math.floor(totalMonths / 12);
+  const month = (totalMonths % 12) + 1;
+  return `${month < 10 ? '0' : ''}${month}/${year}`;
+}
+
+/**
+ * Whole months from `fromMonth` (e.g. a bond's valueAsOf) to the month
+ * `to` (defaults to this device's current month). Negative when `to`
+ * precedes `from` (e.g. a report computed for a future redemption
+ * date). Unparseable inputs return null so callers can treat the
+ * stamp as "unknown" instead of guessing an age.
+ */
+export function monthsBetween(
+  fromMonth: string | undefined,
+  to: { year: number; month: number } = getCurrentReferenceMonth(),
+): number | null {
+  const from = parseMonthToMonths(fromMonth);
+  if (from === null) return null;
+  const toMonths = to.year * 12 + (to.month - 1);
+  return toMonths - from;
+}
+
+/**
+ * True when a bond's value stamp is at least `threshold` whole months
+ * older than the reference month (default: now). Unknown stamps
+ * (pre-feature bonds) count as stale — the dashboard should nudge the
+ * user to re-import rather than silently trust ancient numbers.
+ */
+export function isValueStale(
+  valueAsOf: string | undefined,
+  threshold: number,
+  reference: { year: number; month: number } = getCurrentReferenceMonth(),
+): boolean {
+  const age = monthsBetween(valueAsOf, reference);
+  if (age === null) return true;
+  return age >= threshold;
+}
+
+/**
+ * Aggregate freshness of a whole portfolio, computed from the freshest
+ * value stamp present. `ageInMonths` measures that freshest stamp — an
+ * old portfolio with one freshly re-imported bond is NOT flagged as a
+ * whole (the warning would be meaningless: most rows are still old).
+ * An empty inventory, or one with no stamps at all, is `fresh` (the
+ * empty-state UI already guides first-run setup).
+ */
+export interface PortfolioStaleness {
+  isStale: boolean;
+  ageInMonths: number | null;
+  asOfMonth: string | null; // MM/YYYY of the freshest stamp
+  freshCount: number; // bonds carrying a parseable stamp
+}
+
+export function computePortfolioStaleness(
+  bonds: Bond[],
+  threshold: number,
+  reference: { year: number; month: number } = getCurrentReferenceMonth(),
+): PortfolioStaleness {
+  const referenceMonths = reference.year * 12 + (reference.month - 1);
+  let freshest: number | null = null;
+  let freshCount = 0;
+
+  for (const b of bonds) {
+    const months = parseMonthToMonths(b.valueAsOf);
+    if (months === null) continue;
+    freshCount++;
+    if (freshest === null || months > freshest) freshest = months;
+  }
+
+  if (freshest === null) {
+    return { isStale: false, ageInMonths: null, asOfMonth: null, freshCount: 0 };
+  }
+
+  const ageInMonths = referenceMonths - freshest;
+  return {
+    isStale: ageInMonths >= threshold,
+    ageInMonths,
+    asOfMonth: formatMonthsAsMonth(freshest),
+    freshCount,
+  };
+}
+
+/**
+ * Human-readable as-of label, e.g. "as of July 2026". Unknown stamps
+ * fall back to "value date unknown" so the tooltip is never blank.
+ */
+export function formatAsOfLabel(valueAsOf: string | undefined): string {
+  const months = parseMonthToMonths(valueAsOf);
+  if (months === null) return 'value date unknown';
+  const year = Math.floor(months / 12);
+  const month = (months % 12) + 1;
+  return `as of ${MONTH_NAMES[month]} ${year}`;
+}
+
 /**
  * Parses an HTML file content string and returns list of Bonds.
  * Supports both Table Row parsing and Hidden Input parsing.
@@ -268,6 +407,21 @@ export function generateTreasuryHTML(bonds: Bond[]): string {
   const totalValue = bonds.reduce((sum, b) => sum + b.value, 0);
   const totalInterest = bonds.reduce((sum, b) => sum + b.interest, 0);
 
+  // Carry the portfolio's as-of month through the exported file so a
+  // later re-import of THIS file can restamp without drifting. The
+  // freshest stamp wins, matching how the dashboard judges freshness.
+  // When NO bond carries a stamp the input is omitted entirely (never
+  // a dummy month): parseReportAsOf returns null for such files, so
+  // re-importing them stays "stamp unknown" instead of falsely
+  // marking an ancient portfolio as freshly calculated.
+  const freshestStampCode = bonds.reduce(
+    (max, b) => Math.max(max, encodeTreasuryMonth(b.valueAsOf ?? '')),
+    0,
+  );
+  const redemptionDateInput = freshestStampCode > 0
+    ? `\n\t\t<input type="hidden" name="RedemptionDate" value="${freshestStampCode}">`
+    : '';
+
   let rowsHtml = '';
   bonds.forEach(b => {
     rowsHtml += `<tr>
@@ -318,7 +472,7 @@ export function generateTreasuryHTML(bonds: Bond[]): string {
 		<input type="hidden" name="OldRedemptionDate" value="1023">
 		<input type="hidden" name="ViewPos" value="${bonds.length}">
 		<input type="hidden" name="ViewType" value="All">
-		<input type="hidden" name="Version" value="6">
+		<input type="hidden" name="Version" value="6">${redemptionDateInput}
 		
 		<h2>Calculator Results for Redemption Date</h2>
 		<table id="tot">
@@ -456,7 +610,7 @@ export function parseBondsFromCSV(csvText: string): Bond[] {
     }
     
     // Expected structure:
-    // Serial, Series, Denomination, Issue Date, Next Accrual, Final Maturity, Issue Price, Interest, Interest Rate, Value, Note
+    // Serial, Series, Denomination, Issue Date, Next Accrual, Final Maturity, Issue Price, Interest, Interest Rate, Value, Note[, Value As Of]
     if (cols.length >= 2) {
       const serial = cols[0] || '';
       const seriesRaw = (cols[1] || '').toUpperCase();
@@ -471,6 +625,9 @@ export function parseBondsFromCSV(csvText: string): Bond[] {
       const interestRate = parseFloat((cols[8] || '0').replace(/[^0-9.]/g, '')) || 0;
       const value = parseFloat((cols[9] || '0').replace(/[^0-9.]/g, '')) || 0;
       const note = cols[10] || '';
+      // Optional 12th column (added with as-of tracking). Older
+      // portfolio CSVs have 11 columns; the parser accepts both.
+      const valueAsOf = (cols[11] || '').trim() || undefined;
       
       if (serial) {
         bonds.push({
@@ -484,7 +641,8 @@ export function parseBondsFromCSV(csvText: string): Bond[] {
           interest,
           interestRate,
           value,
-          note
+          note,
+          valueAsOf,
         });
       }
     }
@@ -493,13 +651,190 @@ export function parseBondsFromCSV(csvText: string): Bond[] {
   return bonds;
 }
 
+// ---------- Re-import merging ----------
+
+/**
+ * Result of folding a freshly imported bond report into the local
+ * inventory. `merged` is the complete new list (refreshed existing
+ * bonds in their original order, new bonds appended at the end);
+ * the counts partition the imported rows:
+ *
+ *   addedCount    — serials not previously in the inventory (appended)
+ *   updatedCount  — serials matched an existing bond AND the fresh
+ *                   report's values differed (Interest / Rate / Value /
+ *                   accrual & maturity dates refreshed)
+ *   skippedCount  — serials matched but nothing changed (values were
+ *                   already current)
+ *
+ * `missingFromReport` lists the OTHER direction: serials the local
+ * inventory holds that the fresh report does not mention (redeemed
+ * bonds, or a partial report). The merge itself keeps them in the
+ * inventory; callers use this list to refresh local-only state such
+ * as cash-out selections.
+ */
+export interface MergeImportResult {
+  merged: Bond[];
+  addedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  missingFromReport: string[];
+}
+
+// Parsers emit 2-decimal currency/rate values, but float rounding can
+// drift in the last bits (e.g. `75.00` parsed from CSV vs `75` stored
+// from an earlier HTML import). Half-a-cent tolerance keeps such
+// formatting noise from counting as a spurious "update".
+const SAME_VALUE_EPSILON = 0.005;
+
+function sameNumber(a: number, b: number): boolean {
+  return Math.abs(a - b) < SAME_VALUE_EPSILON;
+}
+
+/**
+ * Extracts the redemption month a Treasury report was calculated for,
+ * as "MM/YYYY", from the hidden `RedemptionDate` input (Treasury's
+ * encoded month value — same scheme as `decodeTreasuryMonth`). Files
+ * without that input — plain CSVs, HTML exports from before as-of
+ * tracking, legacy app saves — yield null, meaning "stamp unknown".
+ */
+export function parseReportAsOf(htmlText: string): string | null {
+  const raw = extractHiddenValue(htmlText, 'RedemptionDate');
+  if (!raw) return null;
+  const code = parseInt(raw, 10);
+  if (isNaN(code)) return null;
+  return decodeTreasuryMonth(code) || null;
+}
+
+/**
+ * True when the report-derived fields of `fresh` differ from the local
+ * copy — i.e. the local bond should be refreshed. Deliberately does NOT
+ * compare `note` or `isCashedOut`: those are local-only fields the
+ * Treasury report can't know about, and the freshly imported note is
+ * usually empty, so comparing them would wrongly flag every re-import
+ * as an update and clobber user notes.
+ */
+function reportValuesDiffer(local: Bond, fresh: Bond): boolean {
+  if (!sameNumber(local.denomination, fresh.denomination)) return true;
+  if (!sameNumber(local.issuePrice, fresh.issuePrice)) return true;
+  if (!sameNumber(local.interest, fresh.interest)) return true;
+  if (!sameNumber(local.interestRate, fresh.interestRate)) return true;
+  if (!sameNumber(local.value, fresh.value)) return true;
+  if (local.issueDate.trim() !== fresh.issueDate.trim()) return true;
+  if (local.nextAccrual.trim() !== fresh.nextAccrual.trim()) return true;
+  if (local.finalMaturity.trim() !== fresh.finalMaturity.trim()) return true;
+  return false;
+}
+
+/**
+ * Merges a freshly imported bond list into the existing inventory,
+ * matched by serial number.
+ *
+ *  - New serials are appended (in import order, after the existing
+ *    bonds — the inventory's own order is never disturbed).
+ *  - Known serials are refreshed with the report-derived fields from
+ *    the import: `denomination`, `issueDate`, `nextAccrual`,
+ *    `finalMaturity`, `issuePrice`, `interest`, `interestRate`, and
+ *    `value`. This is what makes a monthly re-import keep the
+ *    portfolio's totals accurate — bonds accrue interest monthly, so
+ *    last month's Interest/Rate/Value are stale by definition.
+ *  - Local-only fields survive every refresh: `note` and `isCashedOut`
+ *    are kept from the existing bond (the Treasury file has no concept
+ *    of either), and cash-out selections held elsewhere by serial stay
+ *    valid because the serial set only ever grows.
+ *  - Every merged bond is stamped with `valueAsOf` — the month the
+ *    report's figures are "as of", so the dashboard can flag
+ *    portfolios that haven't been re-imported recently. Pass the
+ *    report's redemption month via `options.valueAsOf`. Unchanged
+ *    ("skipped") bonds are ALSO restamped: a fresh report that agrees
+ *    with stored values confirms them as of its month — otherwise a
+ *    portfolio of frozen matured bonds would never refresh and would
+ *    false-positive the staleness banner forever.
+ *  - Identity fields (`serial`, `series`) are never overwritten — the
+ *    serial is the match key and a bond's series doesn't change.
+ *
+ * Pure: neither `existing` nor `imported` (nor their Bond objects) are
+ * mutated; `merged` is a new array whose refreshed entries are new
+ * objects, so React state updates and diffing behave correctly.
+ */
+export function mergeImportedBonds(
+  existing: Bond[],
+  imported: Bond[],
+  options: { valueAsOf?: string } = {},
+): MergeImportResult {
+  const merged: Bond[] = [...existing];
+
+  // First occurrence wins if the inventory somehow contains a repeated
+  // serial (legacy data) — later duplicates are left untouched.
+  const indexBySerial = new Map<string, number>();
+  merged.forEach((b, i) => {
+    if (!indexBySerial.has(b.serial)) indexBySerial.set(b.serial, i);
+  });
+
+  let addedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+
+  // Serials the fresh report actually covers — used at the end to
+  // report which inventory bonds it no longer lists.
+  const importedSerials = new Set<string>();
+
+  for (const fresh of imported) {
+    importedSerials.add(fresh.serial);
+
+    const existingIndex = indexBySerial.get(fresh.serial);
+    if (existingIndex === undefined) {
+      indexBySerial.set(fresh.serial, merged.length);
+      merged.push({ ...fresh, valueAsOf: options.valueAsOf ?? fresh.valueAsOf });
+      addedCount++;
+      continue;
+    }
+
+    const local = merged[existingIndex];
+    if (!reportValuesDiffer(local, fresh)) {
+      // Values already match — but a report month still CONFIRMS them
+      // as current, so refresh the stamp (see docstring above).
+      if (options.valueAsOf && options.valueAsOf !== local.valueAsOf) {
+        merged[existingIndex] = { ...local, valueAsOf: options.valueAsOf };
+      }
+      skippedCount++;
+      continue;
+    }
+
+    // Spread the local bond first so note / isCashedOut (and any
+    // future local-only fields) carry over untouched, then override
+    // with the report-derived values from the fresh file.
+    merged[existingIndex] = {
+      ...local,
+      denomination: fresh.denomination,
+      issueDate: fresh.issueDate,
+      nextAccrual: fresh.nextAccrual,
+      finalMaturity: fresh.finalMaturity,
+      issuePrice: fresh.issuePrice,
+      interest: fresh.interest,
+      interestRate: fresh.interestRate,
+      value: fresh.value,
+      // Re-importing IS the freshness signal — even a bond whose
+      // numbers didn't change is confirmed current by a fresh report.
+      valueAsOf: options.valueAsOf ?? local.valueAsOf,
+    };
+    updatedCount++;
+  }
+
+  const missingFromReport = merged
+    .filter(b => !importedSerials.has(b.serial))
+    .map(b => b.serial);
+
+  return { merged, addedCount, updatedCount, skippedCount, missingFromReport };
+}
+
 /**
  * Generates CSV string for the bond list.
  */
 export function generateCSV(bonds: Bond[]): string {
   const headers = [
     'Serial #', 'Series', 'Denomination', 'Issue Date', 'Next Accrual',
-    'Final Maturity', 'Issue Price', 'Interest', 'Interest Rate', 'Value', 'Note'
+    'Final Maturity', 'Issue Price', 'Interest', 'Interest Rate', 'Value', 'Note',
+    'Value As Of',
   ];
   
   // SECURITY: every text cell passes through `neutralizeCSVFormula`
@@ -518,6 +853,7 @@ export function generateCSV(bonds: Bond[]): string {
     b.interestRate,
     b.value,
     `"${neutralizeCSVFormula(b.note.replace(/"/g, '""'))}"`,
+    `"${neutralizeCSVFormula(b.valueAsOf ?? '')}"`,
   ]);
   
   return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');

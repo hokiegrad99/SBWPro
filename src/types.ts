@@ -10,6 +10,13 @@ export interface Bond {
   interestRate: number; // e.g., 3.32 for 3.32%
   value: number;
   note: string;
+  /**
+   * MM/YYYY month the Interest / Rate / Value figures are "as of".
+   * Stamped on import (from the report's redemption month) or manual
+   * entry; powers the dashboard's value-freshness warning. Bonds saved
+   * before this field existed have no stamp (undefined = unknown).
+   */
+  valueAsOf?: string;
   isCashedOut?: boolean; // Marked for closing or cashing out
 }
 

@@ -15,8 +15,9 @@ _(after enabling GitHub Pages — see deployment below)_
 
 - 📄 **Paper bonds only** — the app tracks **paper** U.S. Treasury I & EE Savings Bonds (the ones you hold physically). Delete this qualifier once electronic-bond support lands.
 - 📊 **Portfolio dashboard** — face value, accrued interest, average coupon rate, and a Series I vs. EE breakdown.
+- 🕑 **Value freshness tracking** — each bond records the month its figures are "as of"; a dashboard banner flags portfolios that haven't been re-imported recently.
 - 🧮 **Federal tax estimator** — pick your marginal bracket, select bonds you plan to cash out, and instantly see taxable interest, tax due, and net proceeds (with a higher-education exclusion toggle).
-- 📥 **Import** from the official U.S. Treasury Savings Bond Calculator HTML file or a generic CSV inventory.
+- 📥 **Import** from the official U.S. Treasury Savings Bond Calculator HTML file or a generic CSV inventory. Re-imports **refresh Interest, Rate, and Value** on matching bonds, preserve notes and cash-out marks, clear marks for redeemed bonds, and offer to remove them.
 - 📤 **Export** your inventory back out as a Treasury-compatible HTML file or standard CSV.
 - 🌗 **Light & dark mode**, with persisted preferences.
 - 🔍 **Search, filter, and sort** by serial, series, maturity status, or marked-for-cash-out.
@@ -156,7 +157,7 @@ The fastest path: drop a saved HTML report from the official calculator straight
    - See your portfolio's total face value, accrued interest, average coupon rate, and the matured-bond warning at the top.
    - Click the pencil icon on any row to add a note (e.g. “Gift from Grandma”).
    - Check the gray square at the left of each bond to mark it for cash-out, then read the *Federal Tax Estimator* panel to see interest subject to tax, tax due, and net proceeds.
-   - **Re-import later** when values have updated — duplicates (matched by serial number) are skipped automatically, so it's safe to drop in a fresh report anytime. **You never need to clear your portfolio first.**
+   - **Re-import later** when values have updated — dropping in a fresh report refreshes the **Interest, Interest Rate, Value, and accrual/maturity dates** of every bond it shares a serial number with, while your local **notes** and **cash-out marks** are preserved. Each refreshed bond is stamped with the report's **as-of month**, and a dashboard banner nudges you when the portfolio's figures are two or more months old. New bonds are added automatically, and bonds whose stored values already match the report are left untouched (but re-stamped). If a bond **no longer appears in the report** (for example, it was redeemed), its cash-out mark is cleared automatically and a dialog offers to **remove it from the inventory** — or keep it if the report was partial. **You never need to clear your portfolio first.**
 
 ### Option B — Add bonds manually
 
@@ -188,11 +189,13 @@ The sample is destructive — it replaces your current portfolio (with a confirm
 If you maintain your bonds in a spreadsheet, export it as CSV with these columns (first row may be a header):
 
 ```
-serial, series, denomination, issueDate, finalMaturity,
-issuePrice, interest, interestRate, value, nextAccrual, note
+serial, series, denomination, issueDate, nextAccrual, finalMaturity,
+issuePrice, interest, interestRate, value, note[, valueAsOf]
 ```
 
-Then drop the `.csv` onto the same import area. Duplicates (matched by serial number) are skipped.
+The final `valueAsOf` column (`MM/YYYY`, the month the figures are "as of") is optional — exports from this app include it, and older 11-column files import fine without it.
+
+Then drop the `.csv` onto the same import area. Merging works the same as for HTML: new serials are added, known serials get their Interest / Rate / Value refreshed, and local notes and cash-out marks survive. Serials missing from the import have their cash-out marks cleared (redeemed bonds) — a dialog then offers to remove them or keep them in the inventory. Unlike HTML reports, plain CSVs carry no as-of month, so imported bonds keep whatever stamps they already had.
 
 ---
 

@@ -38,6 +38,11 @@ import {
   generateTreasuryHTML,
   parseBondsFromCSV,
   generateCSV,
+  mergeImportedBonds,
+  parseReportAsOf,
+  computePortfolioStaleness,
+  formatAsOfLabel,
+  formatMonthsAsMonth,
   isBondMatured,
   CURRENT_REFERENCE_DATE,
 } from './utils/bondParser';
@@ -211,6 +216,27 @@ export default function App() {
   // --- Note Editing State ---
   const [editingSerial, setEditingSerial] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState('');
+
+  // Pending "delete bonds missing from report?" confirm dialog: the
+  // serials the import no longer lists, plus the fileName for the
+  // message. Set during import; rendered as a modal near the other
+  // overlays. Dialog choice → {delete, keep, cancel} handler below.
+  const [pendingRemoval, setPendingRemoval] = useState<{
+    serials: string[];
+    fileName: string;
+  } | null>(null);
+
+  // Dashboard value-freshness banner. Threshold: a portfolio is
+  // "stale" when even its freshest stamp is 2+ months old — savings
+  // bonds accrue monthly, so a month-old snapshot understates value;
+  // two months means the user is clearly not re-importing.
+  const VALUE_STALE_THRESHOLD_MONTHS = 2;
+  const staleness = useMemo(
+    // Pinned reference month (same one the maturity dashboard uses) so
+    // manual/sample entries stamped with REF don't age on the clock.
+    () => computePortfolioStaleness(bonds, VALUE_STALE_THRESHOLD_MONTHS, { year: REF_YEAR, month: REF_MONTH }),
+    [bonds],
+  );
 
   // --- File Drag & Drop ---
   const [isDragging, setIsDragging] = useState(false);
@@ -540,6 +566,9 @@ export default function App() {
       interest: Number(finalInterest.toFixed(2)),
       interestRate: formInterestRate,
       value: Number(finalValue.toFixed(2)),
+      // Figures are "as of" the app's reference month at entry time —
+      // keeps manual rows participating in the freshness banner.
+      valueAsOf: formatMonthsAsMonth(REF_YEAR * 12 + (REF_MONTH - 1)),
       note: formNote.trim()
     };
 
@@ -598,23 +627,92 @@ export default function App() {
         return;
       }
 
-      // Add to portfolio (avoid duplicates by matching serial number)
-      setBonds(prev => {
-        const existingSerials = new Set(prev.map(b => b.serial));
-        const nonDuplicates = importedBonds.filter(b => !existingSerials.has(b.serial));
-        const duplicatesCount = importedBonds.length - nonDuplicates.length;
-        
-        if (duplicatesCount > 0) {
-          showNotification('info', `Imported ${nonDuplicates.length} new bonds. Skipped ${duplicatesCount} duplicate serial numbers.`);
-        } else {
-          showNotification('success', `Successfully imported ${nonDuplicates.length} bonds from "${fileName}"!`);
-        }
-        
-        return [...nonDuplicates, ...prev];
-      });
+      // Merge into the portfolio, matched by serial number: new bonds
+      // are appended, already-owned bonds are refreshed with the fresh
+      // report's Interest / Rate / Value / accrual dates (notes and
+      // cash-out marks are local-only and survive the merge), and bonds
+      // whose stored values already match are left untouched.
+      //
+      // `bonds` from this render's closure is safe to read directly:
+      // the reader.onload callback fires milliseconds after the drop,
+      // and nothing else can mutate bond state in between (the file
+      // dialog blocks interaction on the click path, and drag-drop is
+      // instantaneous). Merging synchronously (instead of inside a
+      // setBonds updater) lets the cash-out selections below be
+      // refreshed from the same merge result in one batched update.
+      // The month the report's figures are "as of" — Treasury reports
+      // carry it in a hidden RedemptionDate input; plain CSVs have no
+      // equivalent (null → bonds keep/omit their stamps).
+      const reportAsOf =
+        fileExtension === 'html' || fileExtension === 'htm' ? parseReportAsOf(text) : null;
+
+      const { merged, addedCount, updatedCount, skippedCount, missingFromReport } =
+        mergeImportedBonds(bonds, importedBonds, { valueAsOf: reportAsOf ?? undefined });
+
+      // Refresh cash-out selections: a serial the report no longer
+      // lists has been redeemed (or was left out of a partial report),
+      // so keeping its tax-estimator mark would silently skew the tax
+      // and proceeds math. The bond itself stays in the inventory —
+      // only the mark is cleared.
+      const unmarkedSerials = missingFromReport.filter(s => selectedSerials.includes(s));
+
+      setBonds(merged);
+      if (unmarkedSerials.length > 0) {
+        setSelectedSerials(prev => prev.filter(s => !unmarkedSerials.includes(s)));
+      }
+
+      // Redeemed / removed bonds: offer deletion via a confirm dialog
+      // rather than silently keeping (or deleting) them. The dialog
+      // renders below; all three choices preserve the merged bonds and
+      // the cleared cash-out marks applied above.
+
+      const parts: string[] = [];
+      if (addedCount > 0) parts.push(`imported ${addedCount} new bond${addedCount === 1 ? '' : 's'}`);
+      if (updatedCount > 0) parts.push(`updated ${updatedCount}`);
+      if (skippedCount > 0) parts.push(`${skippedCount} already up to date`);
+      if (unmarkedSerials.length > 0) {
+        parts.push(`unmarked ${unmarkedSerials.length} for cash-out (no longer in report)`);
+      }
+      if (missingFromReport.length > 0) {
+        setPendingRemoval({ serials: missingFromReport, fileName });
+      }
+
+      if (parts.length > 0) {
+        showNotification(
+          updatedCount > 0 || addedCount > 0 || unmarkedSerials.length > 0 ? 'success' : 'info',
+          `${parts.join(', ')} from "${fileName}".`,
+        );
+      } else {
+        showNotification('info', `Nothing imported from "${fileName}".`);
+      }
     };
 
     reader.readAsText(file);
+  };
+
+  // --- "Delete bonds missing from report?" dialog handlers ---
+
+  /**
+   * Confirms removal of the serials the import no longer lists.
+   * Removes the bonds, their cash-out selections, and closes the
+   * dialog. (Marks were already cleared at import time — clearing
+   * again here is harmless idempotence.)
+   */
+  const handleConfirmRemoval = () => {
+    if (!pendingRemoval) return;
+    const { serials } = pendingRemoval;
+    setBonds(prev => prev.filter(b => !serials.includes(b.serial)));
+    setSelectedSerials(prev => prev.filter(s => !serials.includes(s)));  
+    showNotification('info', `Removed ${serials.length} bond${serials.length === 1 ? '' : 's'} no longer in the report.`);
+    setPendingRemoval(null);
+  };
+
+  /**
+   * "Keep" choice: bonds stay in the inventory (marks already cleared
+   * at import time); just closes the dialog.
+  */
+  const handleKeepMissingBonds = () => {
+    setPendingRemoval(null);
   };
 
   // --- Drag and Drop Handlers ---
@@ -884,6 +982,63 @@ export default function App() {
         </div>
       )}
 
+      {/* Delete-missing-bonds confirm dialog (shown after an import
+          whose report no longer lists owned bonds) */}
+      {pendingRemoval && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          onClick={() => setPendingRemoval(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display font-bold text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+                Remove {pendingRemoval.serials.length} bond{pendingRemoval.serials.length === 1 ? '' : 's'}?
+              </h3>
+              <button
+                onClick={() => setPendingRemoval(null)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
+              <strong className="text-slate-700 dark:text-slate-300">"{pendingRemoval.fileName}"</strong> does not list{' '}
+              {pendingRemoval.serials.length === 1 ? 'this bond' : 'these bonds'} — usually because it was cashed out or
+              redeemed. Their cash-out marks have already been cleared.
+            </p>
+            <ul className="mb-4 max-h-40 overflow-y-auto space-y-1 font-mono text-xs text-slate-600 dark:text-slate-300">
+              {pendingRemoval.serials.map(s => (
+                <li key={s} className="px-2 py-1 bg-slate-50 dark:bg-slate-800/60 rounded">{s}</li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-slate-400 mb-4 leading-relaxed">
+              If the report was partial, keep them — a full report next month will match them again.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleKeepMissingBonds}
+                className="px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer"
+              >
+                Keep in inventory
+              </button>
+              <button
+                onClick={handleConfirmRemoval}
+                className="px-4 py-2 text-sm font-bold bg-rose-600 hover:bg-rose-500 text-white rounded shadow-sm cursor-pointer"
+              >
+                Remove {pendingRemoval.serials.length} bond{pendingRemoval.serials.length === 1 ? '' : 's'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Privacy Notice (local-only processing guarantee).
           Dismissable; preference persists in localStorage so
           returning users don't see it again. The wording deliberately
@@ -1028,6 +1183,25 @@ export default function App() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* Value freshness: nudge when the portfolio hasn't been
+            re-imported recently. Only fires when at least one bond
+            carries an as-of stamp — a portfolio with no stamps at all
+            (pre-feature data, sample) counts as unknown, not stale. */}
+        {staleness.isStale && staleness.asOfMonth && (
+          <div className="flex items-start gap-4 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-900 dark:bg-blue-950/20 dark:text-blue-200 rounded shadow-sm">
+            <Clock className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-sm uppercase tracking-wide text-slate-900 dark:text-white">
+                Portfolio values are {staleness.ageInMonths} month{staleness.ageInMonths === 1 ? '' : 's'} old
+              </h3>
+              <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
+                Figures are as of {staleness.asOfMonth}. Savings bonds earn interest monthly — re-import a
+                fresh TreasuryDirect report to update Interest, Rate, and Value across your inventory.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic Warning for Matured Bonds */}
         {stats.maturedCount > 0 && (
@@ -1886,7 +2060,10 @@ export default function App() {
                             </td>
 
                             {/* Current Value */}
-                            <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400 font-bold">
+                            <td
+                              className="py-2 px-3 text-right text-blue-600 dark:text-blue-400 font-bold"
+                              title={formatAsOfLabel(b.valueAsOf)}
+                            >
                               ${b.value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </td>
 
