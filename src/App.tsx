@@ -1255,7 +1255,7 @@ export default function App() {
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-          {/* ================= LEFT SIDEBAR (Metrics, Graphs, Taxes, Actions) ================= */}
+          {/* ================= LEFT SIDEBAR (Metrics, Graphs, Actions) ================= */}
           <div className="lg:col-span-4 space-y-6">
 
             {/* Panel 1: Key Portfolio Figures */}
@@ -1374,6 +1374,16 @@ export default function App() {
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">{stats.averageRate.toFixed(2)}%</span>
               </div>
             </section>
+
+          </div>
+
+          {/* ================= RIGHT PORTFOLIO PANEL (Federal Tax Estimator) ================= */}
+          {/* The filter toolbar and the inventory table intentionally live
+              OUTSIDE the dashboard grid, directly below it: the 12-column
+              table needs the full page width (~1214px) to fit without
+              horizontal scrolling, and the toolbar stays attached to the
+              table it controls. */}
+          <div className="lg:col-span-8 space-y-6">
 
             {/* Panel 2: Interactive Federal Tax Estimator */}
             <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
@@ -1507,181 +1517,6 @@ export default function App() {
                   </p>
                 </div>
               </details>
-            </section>
-
-            {/* Panel 3: Import & Export Operations */}
-            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <ArrowRightLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h2 className="font-display font-bold text-sm tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                  Import &amp; Export Inventory
-                </h2>
-              </div>
-
-              {/* First-run onboarding tooltip pointing at the drop zone */}
-              {!firstRunTooltipDismissed && bonds.length === 0 && (
-                <div role="status" className="mb-3 px-3 py-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 rounded-lg flex items-start justify-between gap-2 text-xs text-amber-900 dark:text-amber-200 shadow-sm">
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
-                    <div>
-                      <strong className="block text-[11px] uppercase tracking-wider font-bold">
-                        First time here?
-                      </strong>
-                      <span>
-                        Drop an HTML save from{' '}
-                        <a
-                          href={TREASURY_CALCULATOR_URL}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline font-mono font-bold text-blue-700 dark:text-blue-400"
-                        >
-                          TreasuryDirect
-                        </a>{' '}
-                        into the box below — or click the box to browse.
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={dismissFirstRunTooltip}
-                    className="text-amber-700 dark:text-amber-300 hover:opacity-70 flex-shrink-0 cursor-pointer"
-                    aria-label="Dismiss first-run tooltip"
-                    title="Got it"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* HTML drag and drop workspace */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
-                  isDragging 
-                    ? 'border-emerald-500 bg-emerald-500/10' 
-                    : !firstRunTooltipDismissed && bonds.length === 0
-                      ? 'border-amber-400 dark:border-amber-500 ring-4 ring-amber-400/40 dark:ring-amber-500/30 animate-pulse-subtle bg-amber-50/30 dark:bg-amber-950/10'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                }`}
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept=".html,.htm,.csv"
-                  className="hidden" 
-                />
-                <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Drop files here or click to browse
-                </h4>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Supports US Treasury HTML files &amp; Portfolio CSV files
-                </p>
-              </div>
-
-              <div className="text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800/30 p-3 rounded-xl leading-relaxed space-y-1 border border-slate-200/40 dark:border-slate-700/30">
-                <strong className="text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                  <Info className="w-3.5 h-3.5" />
-                  How to get your Treasury HTML file:
-                </strong>
-                <ol className="list-decimal pl-4 space-y-0.5">
-                  <li>Go to the US Treasury Savings Bond Calculator website.</li>
-                  <li>Calculate the current value of your paper savings bonds.</li>
-                  <li>Click "Save" or "Save as" in your browser.</li>
-                  <li>Upload that downloaded HTML file directly here!</li>
-                </ol>
-              </div>
-
-              {/* Export Buttons */}
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  onClick={handleExportHTML}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
-                  title="Download HTML file compatible with US Treasury Savings Bond website"
-                >
-                  <FileCode className="w-4 h-4 text-orange-500" />
-                  <span>Export HTML</span>
-                </button>
-                <button
-                  onClick={handleExportCSV}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
-                  title="Download CSV database of your savings bonds"
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
-                  <span>Export CSV</span>
-                </button>
-              </div>
-            </section>
-
-          </div>
-
-          {/* ================= RIGHT PORTFOLIO PANEL (Quick Reference) ================= */}
-          {/* The filter toolbar and the inventory table intentionally live
-              OUTSIDE the dashboard grid, directly below it: the 12-column
-              table needs the full page width (~1214px) to fit without
-              horizontal scrolling, and the toolbar stays attached to the
-              table it controls. */}
-          <div className="lg:col-span-8 space-y-6">
-
-            {/* Quick Informational Guide Section */}
-            <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <BookOpen className="w-4 h-4 text-amber-500" />
-                <h3 className="font-display font-bold text-sm text-slate-700 dark:text-slate-200">
-                  US Savings Bonds Quick Reference &amp; Calculator Guide
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    Series I Savings Bonds
-                  </h4>
-                  <p>
-                    Purchased at 100% of face value (a $50 bond costs $50). Earning rates are a combination of a fixed rate and an inflation-indexed rate (adjusted semi-annually in May and November). They are designed to protect purchasing power against currency inflation.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    Series EE Savings Bonds
-                  </h4>
-                  <p>
-                    Purchased at 50% of face value (a $100 paper bond costs $50). Paper EE bonds issued since May 2005 have a fixed interest rate, but are legally guaranteed by the US Treasury to double in value exactly 20 years from the issue date.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-800/20 p-3 rounded border border-slate-100/50 dark:border-slate-700/50 flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
-                <Clock className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                <p>
-                  <strong>Accrual Notes:</strong> Interest is compiled monthly and added to the principal balance semi-annually. If you redeem a bond within the first 5 years of ownership, you lose the most recent 3 months of interest. After 5 years, there is zero penalty.
-                </p>
-              </div>
-
-              {/* External help link to the official TreasuryDirect calculator instructions */}
-              <div className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
-                <HelpCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                <p>
-                  For step-by-step instructions on entering your bonds into the official calculator, see the{' '}
-                  <a
-                    href={TREASURY_CALCULATOR_HELP_URL}
-
-                    aria-label="TreasuryDirect Savings Bond Calculator instructions (opens in new tab)"                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline font-bold"
-                  >
-                    TreasuryDirect Savings Bond Calculator instructions ↗
-                  </a>
-                  .
-                </p>
-              </div>
-            
             </section>
 
           </div>
@@ -2304,6 +2139,171 @@ export default function App() {
             </table>
           </div>
 
+        </section>
+
+        {/* Quick Informational Guide Section */}
+        <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <BookOpen className="w-4 h-4 text-amber-500" />
+            <h3 className="font-display font-bold text-sm text-slate-700 dark:text-slate-200">
+              US Savings Bonds Quick Reference &amp; Calculator Guide
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Series I Savings Bonds
+              </h4>
+              <p>
+                Purchased at 100% of face value (a $50 bond costs $50). Earning rates are a combination of a fixed rate and an inflation-indexed rate (adjusted semi-annually in May and November). They are designed to protect purchasing power against currency inflation.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Series EE Savings Bonds
+              </h4>
+              <p>
+                Purchased at 50% of face value (a $100 paper bond costs $50). Paper EE bonds issued since May 2005 have a fixed interest rate, but are legally guaranteed by the US Treasury to double in value exactly 20 years from the issue date.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-800/20 p-3 rounded border border-slate-100/50 dark:border-slate-700/50 flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+            <Clock className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p>
+              <strong>Accrual Notes:</strong> Interest is compiled monthly and added to the principal balance semi-annually. If you redeem a bond within the first 5 years of ownership, you lose the most recent 3 months of interest. After 5 years, there is zero penalty.
+            </p>
+          </div>
+
+          {/* External help link to the official TreasuryDirect calculator instructions */}
+          <div className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+            <HelpCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p>
+              For step-by-step instructions on entering your bonds into the official calculator, see the{' '}
+              <a
+                href={TREASURY_CALCULATOR_HELP_URL}
+
+                aria-label="TreasuryDirect Savings Bond Calculator instructions (opens in new tab)"                    target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline font-bold"
+              >
+                TreasuryDirect Savings Bond Calculator instructions ↗
+              </a>
+              .
+            </p>
+          </div>
+        
+        </section>
+
+        {/* Panel 3: Import & Export Operations */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <ArrowRightLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h2 className="font-display font-bold text-sm tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              Import &amp; Export Inventory
+            </h2>
+          </div>
+
+          {/* First-run onboarding tooltip pointing at the drop zone */}
+          {!firstRunTooltipDismissed && bonds.length === 0 && (
+            <div role="status" className="mb-3 px-3 py-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 rounded-lg flex items-start justify-between gap-2 text-xs text-amber-900 dark:text-amber-200 shadow-sm">
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                <div>
+                  <strong className="block text-[11px] uppercase tracking-wider font-bold">
+                    First time here?
+                  </strong>
+                  <span>
+                    Drop an HTML save from{' '}
+                    <a
+                      href={TREASURY_CALCULATOR_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline font-mono font-bold text-blue-700 dark:text-blue-400"
+                    >
+                      TreasuryDirect
+                    </a>{' '}
+                    into the box below — or click the box to browse.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={dismissFirstRunTooltip}
+                className="text-amber-700 dark:text-amber-300 hover:opacity-70 flex-shrink-0 cursor-pointer"
+                aria-label="Dismiss first-run tooltip"
+                title="Got it"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* HTML drag and drop workspace */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+              isDragging 
+                ? 'border-emerald-500 bg-emerald-500/10' 
+                : !firstRunTooltipDismissed && bonds.length === 0
+                  ? 'border-amber-400 dark:border-amber-500 ring-4 ring-amber-400/40 dark:ring-amber-500/30 animate-pulse-subtle bg-amber-50/30 dark:bg-amber-950/10'
+                  : 'border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+            }`}
+          >
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".html,.htm,.csv"
+              className="hidden" 
+            />
+            <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+              Drop files here or click to browse
+            </h4>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Supports US Treasury HTML files &amp; Portfolio CSV files
+            </p>
+          </div>
+
+          <div className="text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800/30 p-3 rounded-xl leading-relaxed space-y-1 border border-slate-200/40 dark:border-slate-700/30">
+            <strong className="text-slate-700 dark:text-slate-300 flex items-center gap-1">
+              <Info className="w-3.5 h-3.5" />
+              How to get your Treasury HTML file:
+            </strong>
+            <ol className="list-decimal pl-4 space-y-0.5">
+              <li>Go to the US Treasury Savings Bond Calculator website.</li>
+              <li>Calculate the current value of your paper savings bonds.</li>
+              <li>Click "Save" or "Save as" in your browser.</li>
+              <li>Upload that downloaded HTML file directly here!</li>
+            </ol>
+          </div>
+
+          {/* Export Buttons */}
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            <button
+              onClick={handleExportHTML}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+              title="Download HTML file compatible with US Treasury Savings Bond website"
+            >
+              <FileCode className="w-4 h-4 text-orange-500" />
+              <span>Export HTML</span>
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+              title="Download CSV database of your savings bonds"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+              <span>Export CSV</span>
+            </button>
+          </div>
         </section>
 
       </main>
