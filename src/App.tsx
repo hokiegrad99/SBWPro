@@ -1618,617 +1618,13 @@ export default function App() {
 
           </div>
 
-          {/* ================= RIGHT PORTFOLIO PANEL (Filters, List, Add Bond) ================= */}
+          {/* ================= RIGHT PORTFOLIO PANEL (Quick Reference) ================= */}
+          {/* The filter toolbar and the inventory table intentionally live
+              OUTSIDE the dashboard grid, directly below it: the 12-column
+              table needs the full page width (~1214px) to fit without
+              horizontal scrolling, and the toolbar stays attached to the
+              table it controls. */}
           <div className="lg:col-span-8 space-y-6">
-
-            {/* Quick Filter, Search & Adding Section */}
-            <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
-              <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-                
-                {/* Unified Search Input */}
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by Serial or Note..."
-                    className="w-full text-xs pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 dark:text-white rounded focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-mono"
-                  />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Dropdown Select Filters */}
-                <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                  
-                  {/* Series I vs EE Filter */}
-                  <select
-                    value={filterSeries}
-                    onChange={(e) => setFilterSeries(e.target.value as any)}
-                    className="text-xs border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-700 dark:text-slate-200 cursor-pointer"
-                  >
-                    <option value="All">All Series</option>
-                    <option value="I">Series I</option>
-                    <option value="EE">Series EE</option>
-                  </select>
-
-                  {/* Maturity status */}
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as any)}
-                    className="text-xs border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-700 dark:text-slate-200 cursor-pointer"
-                  >
-                    <option value="All">All Maturity Status</option>
-                    <option value="Active">Active &amp; Earning</option>
-                    <option value="Matured">Matured (Stopped Earning)</option>
-                  </select>
-
-                  {/* Cashout status */}
-                  <select
-                    value={filterCashOut}
-                    onChange={(e) => setFilterCashOut(e.target.value as any)}
-                    className="text-xs border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-700 dark:text-slate-200 cursor-pointer"
-                  >
-                    <option value="All">All Cash-out Status</option>
-                    <option value="Marked">Marked for Cash Out</option>
-                    <option value="Kept">Retained Portfolio</option>
-                  </select>
-                </div>
-
-                {/* Add Bond Toggle */}
-                <button
-                  onClick={() => setIsAddingBond(prev => !prev)}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded shadow-sm transition-all w-full md:w-auto justify-center cursor-pointer"
-                >
-                  {isAddingBond ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                  <span>{isAddingBond ? "Cancel" : "New Bond Entry +"}</span>
-                </button>
-
-              </div>
-
-              {/* Inline expandable manual addition form */}
-              {isAddingBond && (
-                <form 
-                  onSubmit={handleAddManualBond}
-                  className="mt-4 p-4 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 rounded space-y-4 animate-fadeIn"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-display">
-                      <Plus className="w-3.5 h-3.5 text-amber-500" />
-                      Add Bond Manually
-                    </h3>
-                    <button 
-                      type="button" 
-                      onClick={() => setIsAddingBond(false)}
-                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {formError && (
-                    <div className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 p-2.5 rounded border border-rose-100 dark:border-rose-900">
-                      {formError}
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    
-                    {/* Series Choice */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Series</label>
-                      <div className="grid grid-cols-2 gap-1 border border-slate-200 dark:border-slate-700 rounded p-0.5 bg-white dark:bg-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setFormSeries('I')}
-                          className={`py-1 text-xs font-bold rounded ${
-                            formSeries === 'I' 
-                              ? 'bg-amber-500 text-slate-900' 
-                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          Series I
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormSeries('EE')}
-                          className={`py-1 text-xs font-bold rounded ${
-                            formSeries === 'EE' 
-                              ? 'bg-amber-500 text-slate-900' 
-                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          Series EE
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Serial Number */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Serial Number</label>
-                      <input 
-                        type="text"
-                        value={formSerial}
-                        onChange={(e) => setFormSerial(e.target.value)}
-                        placeholder="e.g. C827841069EE"
-                        required
-                        className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      />
-                    </div>
-
-                    {/* Denomination Choice */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Face Denomination</label>
-                      <select
-                        value={formDenomination}
-                        onChange={(e) => setFormDenomination(parseFloat(e.target.value))}
-                        className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                      >
-                        <option value={50}>$50</option>
-                        <option value={100}>$100</option>
-                        <option value={200}>$200</option>
-                        <option value={500}>$500</option>
-                        <option value={1000}>$1,000</option>
-                        <option value={5000}>$5,000</option>
-                        <option value={10000}>$10,000</option>
-                      </select>
-                    </div>
-
-                    {/* Issue Date */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex justify-between">
-                        <span>Issue Date</span>
-                        <span className="font-normal text-slate-400 lowercase">MM/YYYY</span>
-                      </label>
-                      <input 
-                        type="text"
-                        value={formIssueDate}
-                        onChange={(e) => setFormIssueDate(e.target.value)}
-                        placeholder="MM/YYYY"
-                        required
-                        className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      />
-                    </div>
-
-                    {/* Interest Rate */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Interest Rate (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        max={100}
-                        value={formInterestRate}
-                        onChange={(e) => setFormInterestRate(parseFloat(e.target.value) || 0)}
-                        required
-                        className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      />
-                    </div>
-
-                    {/* Current Value */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current Value ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        value={formCurrentValue}
-                        onChange={(e) => setFormCurrentValue(parseFloat(e.target.value) || 0)}
-                        required
-                        className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      />
-                    </div>
-
-                    {/* Note */}
-                    <div className="space-y-1 sm:col-span-2">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Note (optional)</label>
-                      <input 
-                        type="text"
-                        value={formNote}
-                        onChange={(e) => setFormNote(e.target.value)}
-                        placeholder="e.g. Gift from grandparents"
-                        className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      />
-                    </div>
-
-                  </div>
-
-                  {/* Summary of manual calculation prior to saving */}
-                  <div className="grid grid-cols-3 gap-2 bg-white dark:bg-slate-800/20 p-2.5 rounded text-[11px] border border-slate-200/40 dark:border-slate-700/30 text-slate-500 font-mono">
-                    <div>
-                      <span>Final Maturity:</span> <strong className="text-slate-700 dark:text-slate-200">{computeFinalMaturity(formIssueDate)}</strong>
-                    </div>
-                    <div>
-                      <span>Issue Price:</span> <strong className="text-slate-700 dark:text-slate-200">${computedIssuePrice.toFixed(2)}</strong>
-                    </div>
-                    <div>
-                      <span>Estimated Interest:</span> <strong className="text-amber-500">{Math.max(0, formCurrentValue - computedIssuePrice).toFixed(2)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingBond(false)}
-                      className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded shadow-sm cursor-pointer"
-                    >
-                      Save Bond
-                    </button>
-                  </div>
-                </form>
-              )}
-            </section>
-
-            {/* Primary Bonds Table Container */}
-            <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              
-              {/* Header inside container */}
-              <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
-                <h3 className="font-display font-bold text-sm tracking-wide text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                  <Wallet className="w-4 h-4 text-amber-500" />
-                  Bonds Inventory
-                  <span className="font-mono text-xs text-slate-400 font-normal">
-                    ({sortedAndFilteredBonds.length} of {bonds.length} listed)
-                  </span>
-                </h3>
-                
-                {/* Select All checkbox triggers */}
-                {sortedAndFilteredBonds.length > 0 && (
-                  <button
-                    onClick={() => handleSelectAllFiltered(sortedAndFilteredBonds)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/60 rounded border border-slate-200/50 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-                  >
-                    {sortedAndFilteredBonds.every(b => selectedSerials.includes(b.serial)) ? (
-                      <>
-                        <CheckSquare className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Deselect All Listed</span>
-                      </>
-                    ) : (
-                      <>
-                        <Square className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Select All Listed for Cash Out</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Responsive Table Layout */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-850 text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">
-                      <th className="py-3 px-4 w-12 text-center">Cashout</th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onClick={() => handleSort('serial')}>
-                        <div className="flex items-center gap-1">
-                          Serial #
-                          {sortBy === 'serial' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-center" onClick={() => handleSort('series')}>
-                        <div className="flex items-center justify-center gap-1">
-                          Series
-                          {sortBy === 'series' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('denomination')}>
-                        <div className="flex items-center justify-end gap-1">
-                          Denom
-                          {sortBy === 'denomination' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-center" onClick={() => handleSort('issueDate')}>
-                        <div className="flex items-center justify-center gap-1">
-                          Issue Date
-                          {sortBy === 'issueDate' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-center" onClick={() => handleSort('finalMaturity')}>
-                        <div className="flex items-center justify-center gap-1">
-                          Maturity
-                          {sortBy === 'finalMaturity' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('issuePrice')}>
-                        <div className="flex items-center justify-end gap-1">
-                          Cost
-                          {sortBy === 'issuePrice' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('interest')}>
-                        <div className="flex items-center justify-end gap-1">
-                          Interest
-                          {sortBy === 'interest' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right animate-pulse-subtle" onClick={() => handleSort('interestRate')}>
-                        <div className="flex items-center justify-end gap-1">
-                          Rate
-                          {sortBy === 'interestRate' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('value')}>
-                        <div className="flex items-center justify-end gap-1">
-                          Value
-                          {sortBy === 'value' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                      <th className="py-3 px-4 w-40">Note</th>
-                      <th className="py-3 px-3 w-10 text-center"></th>
-                    </tr>
-                  </thead>
-                  
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono text-xs">
-                    {sortedAndFilteredBonds.length > 0 ? (
-                      sortedAndFilteredBonds.map(b => {
-                        const isSelected = selectedSerials.includes(b.serial);
-                        const isMatured = isBondMatured(b.finalMaturity, REF_YEAR, REF_MONTH);
-
-                        return (
-                          <tr 
-                            key={b.serial}
-                            className={`hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition-colors ${
-                              isSelected 
-                                ? 'bg-amber-500/5 dark:bg-amber-500/10' 
-                                : isMatured 
-                                  ? 'bg-amber-500/[0.02] dark:bg-amber-500/[0.02]' 
-                                  : ''
-                            }`}
-                          >
-                            {/* Checkbox */}
-                            <td className="py-2 px-4 text-center">
-                              <button 
-                                type="button"
-                                onClick={() => handleToggleSelect(b.serial)}
-                                className="inline-flex focus:outline-none hover:scale-110 transition-transform cursor-pointer"
-                                title={isSelected ? "Unmark this bond for Cash Out" : "Mark this bond for Cash Out & Tax liability"}
-                              >
-                                {isSelected ? (
-                                  <CheckSquare className="w-4 h-4 text-amber-500" />
-                                ) : (
-                                  <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
-                                )}
-                              </button>
-                            </td>
-
-                            {/* Serial # */}
-                            <td className="py-2 px-3 font-semibold text-slate-700 dark:text-slate-300">
-                              {b.serial}
-                            </td>
-
-                            {/* Series Badge */}
-                            <td className="py-2 px-3 text-center">
-                              {b.series === 'I' ? (
-                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
-                                  I
-                                </span>
-                              ) : (
-                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-400">
-                                  EE
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Denomination */}
-                            <td className="py-2 px-3 text-right text-slate-500 dark:text-slate-400">
-                              ${b.denomination.toLocaleString('en-US')}
-                            </td>
-
-                            {/* Issue Date */}
-                            <td className="py-2 px-3 text-center text-slate-500 dark:text-slate-400">
-                              {b.issueDate}
-                            </td>
-
-                            {/* Maturity Date */}
-                            <td className="py-2 px-3 text-center">
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className="text-slate-600 dark:text-slate-300">{b.finalMaturity}</span>
-                                {isMatured && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400 rounded-full animate-pulse-subtle">
-                                    MATURED
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Cost */}
-                            <td className="py-2 px-3 text-right text-slate-500 dark:text-slate-400">
-                              ${b.issuePrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-
-                            {/* Interest */}
-                            <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold">
-                              +${b.interest.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-
-                            {/* Rate */}
-                            <td className="py-2 px-3 text-right text-slate-700 dark:text-slate-300 font-bold">
-                              {b.interestRate.toFixed(2)}%
-                            </td>
-
-                            {/* Current Value */}
-                            <td
-                              className="py-2 px-3 text-right text-blue-600 dark:text-blue-400 font-bold"
-                              title={formatAsOfLabel(b.valueAsOf)}
-                            >
-                              ${b.value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-
-                            {/* Notes column (with inline editing) */}
-                            <td className="py-2 px-4 max-w-xs truncate text-[11px]">
-                              {editingSerial === b.serial ? (
-                                <div className="flex items-center gap-1.5">
-                                  <input 
-                                    type="text"
-                                    value={editingNote}
-                                    onChange={(e) => setEditingNote(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') handleSaveNote(b.serial);
-                                      if (e.key === 'Escape') setEditingSerial(null);
-                                    }}
-                                    className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded text-[11px] font-sans text-slate-800 dark:text-white w-full"
-                                    autoFocus
-                                  />
-                                  <button 
-                                    onClick={() => handleSaveNote(b.serial)}
-                                    className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 rounded"
-                                  >
-                                    <Check className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => setEditingSerial(null)}
-                                    className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 rounded"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="group flex items-center justify-between gap-1.5">
-                                  <span className="text-slate-500 dark:text-slate-400 italic">
-                                    {b.note || "—"}
-                                  </span>
-                                  <button 
-                                    onClick={() => handleStartEditNote(b.serial, b.note)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded transition-opacity"
-                                    title="Edit note"
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Deletion action */}
-                            <td className="py-2 px-3 text-center">
-                              <button
-                                onClick={() => handleDeleteBond(b.serial)}
-                                className="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Remove bond from portfolio"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={12} className="py-8 px-6 text-slate-500 font-sans">
-                          {bonds.length === 0 ? (
-                            <div className="max-w-3xl mx-auto bg-gradient-to-br from-slate-50 to-amber-50/40 dark:from-slate-900/60 dark:to-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl p-8">
-                              <div className="text-center mb-6">
-                                <Coins className="w-10 h-10 mx-auto mb-3 text-amber-500" />
-                                <h4 className="font-display font-bold text-xl text-slate-800 dark:text-slate-100 mb-2">
-                                  Your portfolio is empty
-                                </h4>
-                                <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto">
-                                  Pick a starting option below. The app will not load
-                                  sample data behind your back — you choose how it
-                                  begins.
-                                </p>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
-                                  <BookOpen className="w-5 h-5 text-amber-500 mb-2" />
-                                  <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
-                                    Import from TreasuryDirect
-                                  </h5>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-                                    Save an HTML report from the official calculator
-                                    and drop it on the import area in the sidebar.
-                                  </p>
-                                  <a
-                                    href={TREASURY_CALCULATOR_URL}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-bold"
-                                  >
-                                    Open calculator →
-                                  </a>
-                                </div>
-                                <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
-                                  <Plus className="w-5 h-5 text-emerald-500 mb-2" />
-                                  <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
-                                    Add one manually
-                                  </h5>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-                                    Use the amber “New Bond Entry +” button above
-                                    to enter a single bond.
-                                  </p>
-                                </div>
-                                <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
-                                  <RefreshCw className="w-5 h-5 text-indigo-500 mb-2" />
-                                  <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
-                                    Explore with samples
-                                  </h5>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-                                    Try {SAMPLE_BONDS.length} example bonds matching the official
-                                    Treasury calculator output.
-                                  </p>
-                                  <button
-                                    onClick={handleLoadSample}
-                                    className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-bold cursor-pointer"
-                                  >
-                                    Load sample portfolio →
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                              <h4 className="font-semibold text-slate-700 dark:text-slate-300">No Savings Bonds Found</h4>
-                              <p className="text-xs mt-1">No bonds match your active search filter criteria.</p>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  
-                  {/* Totals Summary Row */}
-                  {sortedAndFilteredBonds.length > 0 && (
-                    <tfoot className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 font-mono text-xs font-bold text-slate-700 dark:text-slate-200">
-                      <tr>
-                        <td colSpan={3} className="py-3 px-4 text-slate-500 font-sans text-right">
-                          Page Totals ({sortedAndFilteredBonds.length} Bonds)
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          ${sortedAndFilteredBonds.reduce((sum, b) => sum + b.denomination, 0).toLocaleString('en-US')}
-                        </td>
-                        <td colSpan={2}></td>
-                        <td className="py-3 px-3 text-right">
-                          ${sortedAndFilteredBonds.reduce((sum, b) => sum + b.issuePrice, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-3 text-right text-emerald-600 dark:text-emerald-400">
-                          +${sortedAndFilteredBonds.reduce((sum, b) => sum + b.interest, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td></td>
-                        <td className="py-3 px-3 text-right text-blue-600 dark:text-blue-400">
-                          ${sortedAndFilteredBonds.reduce((sum, b) => sum + b.value, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td colSpan={2}></td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-
-            </section>
 
             {/* Quick Informational Guide Section */}
             <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
@@ -2291,6 +1687,624 @@ export default function App() {
           </div>
 
         </div>
+
+        {/* Quick Filter, Search & Adding Section */}
+        <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+
+            {/* Unified Search Input */}
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by Serial or Note..."
+                className="w-full text-xs pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 dark:text-white rounded focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-mono"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown Select Filters */}
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
+
+              {/* Series I vs EE Filter */}
+              <select
+                value={filterSeries}
+                onChange={(e) => setFilterSeries(e.target.value as any)}
+                className="text-xs border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-700 dark:text-slate-200 cursor-pointer"
+              >
+                <option value="All">All Series</option>
+                <option value="I">Series I</option>
+                <option value="EE">Series EE</option>
+              </select>
+
+              {/* Maturity status */}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="text-xs border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-700 dark:text-slate-200 cursor-pointer"
+              >
+                <option value="All">All Maturity Status</option>
+                <option value="Active">Active &amp; Earning</option>
+                <option value="Matured">Matured (Stopped Earning)</option>
+              </select>
+
+              {/* Cashout status */}
+              <select
+                value={filterCashOut}
+                onChange={(e) => setFilterCashOut(e.target.value as any)}
+                className="text-xs border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-700 dark:text-slate-200 cursor-pointer"
+              >
+                <option value="All">All Cash-out Status</option>
+                <option value="Marked">Marked for Cash Out</option>
+                <option value="Kept">Retained Portfolio</option>
+              </select>
+            </div>
+
+            {/* Add Bond Toggle */}
+            <button
+              onClick={() => setIsAddingBond(prev => !prev)}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded shadow-sm transition-all w-full md:w-auto justify-center cursor-pointer"
+            >
+              {isAddingBond ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              <span>{isAddingBond ? "Cancel" : "New Bond Entry +"}</span>
+            </button>
+
+          </div>
+
+          {/* Inline expandable manual addition form */}
+          {isAddingBond && (
+            <form 
+              onSubmit={handleAddManualBond}
+              className="mt-4 p-4 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 rounded space-y-4 animate-fadeIn"
+            >
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-display">
+                  <Plus className="w-3.5 h-3.5 text-amber-500" />
+                  Add Bond Manually
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddingBond(false)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 p-2.5 rounded border border-rose-100 dark:border-rose-900">
+                  {formError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+
+                {/* Series Choice */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Series</label>
+                  <div className="grid grid-cols-2 gap-1 border border-slate-200 dark:border-slate-700 rounded p-0.5 bg-white dark:bg-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setFormSeries('I')}
+                      className={`py-1 text-xs font-bold rounded ${
+                        formSeries === 'I' 
+                          ? 'bg-amber-500 text-slate-900' 
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      Series I
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormSeries('EE')}
+                      className={`py-1 text-xs font-bold rounded ${
+                        formSeries === 'EE' 
+                          ? 'bg-amber-500 text-slate-900' 
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      Series EE
+                    </button>
+                  </div>
+                </div>
+
+                {/* Serial Number */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Serial Number</label>
+                  <input 
+                    type="text"
+                    value={formSerial}
+                    onChange={(e) => setFormSerial(e.target.value)}
+                    placeholder="e.g. C827841069EE"
+                    required
+                    className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                {/* Denomination Choice */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Face Denomination</label>
+                  <select
+                    value={formDenomination}
+                    onChange={(e) => setFormDenomination(parseFloat(e.target.value))}
+                    className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  >
+                    <option value={50}>$50</option>
+                    <option value={100}>$100</option>
+                    <option value={200}>$200</option>
+                    <option value={500}>$500</option>
+                    <option value={1000}>$1,000</option>
+                    <option value={5000}>$5,000</option>
+                    <option value={10000}>$10,000</option>
+                  </select>
+                </div>
+
+                {/* Issue Date */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex justify-between">
+                    <span>Issue Date</span>
+                    <span className="font-normal text-slate-400 lowercase">MM/YYYY</span>
+                  </label>
+                  <input 
+                    type="text"
+                    value={formIssueDate}
+                    onChange={(e) => setFormIssueDate(e.target.value)}
+                    placeholder="MM/YYYY"
+                    required
+                    className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                {/* Interest Rate */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Interest Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    max={100}
+                    value={formInterestRate}
+                    onChange={(e) => setFormInterestRate(parseFloat(e.target.value) || 0)}
+                    required
+                    className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                {/* Current Value */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current Value ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={formCurrentValue}
+                    onChange={(e) => setFormCurrentValue(parseFloat(e.target.value) || 0)}
+                    required
+                    className="w-full text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                {/* Note */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Note (optional)</label>
+                  <input 
+                    type="text"
+                    value={formNote}
+                    onChange={(e) => setFormNote(e.target.value)}
+                    placeholder="e.g. Gift from grandparents"
+                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 p-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+              </div>
+
+              {/* Summary of manual calculation prior to saving */}
+              <div className="grid grid-cols-3 gap-2 bg-white dark:bg-slate-800/20 p-2.5 rounded text-[11px] border border-slate-200/40 dark:border-slate-700/30 text-slate-500 font-mono">
+                <div>
+                  <span>Final Maturity:</span> <strong className="text-slate-700 dark:text-slate-200">{computeFinalMaturity(formIssueDate)}</strong>
+                </div>
+                <div>
+                  <span>Issue Price:</span> <strong className="text-slate-700 dark:text-slate-200">${computedIssuePrice.toFixed(2)}</strong>
+                </div>
+                <div>
+                  <span>Estimated Interest:</span> <strong className="text-amber-500">{Math.max(0, formCurrentValue - computedIssuePrice).toFixed(2)}</strong>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingBond(false)}
+                  className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded shadow-sm cursor-pointer"
+                >
+                  Save Bond
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+
+        {/* Primary Bonds Table Container */}
+        <section className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+
+          {/* Header inside container */}
+          <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
+            <h3 className="font-display font-bold text-sm tracking-wide text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+              <Wallet className="w-4 h-4 text-amber-500" />
+              Bonds Inventory
+              <span className="font-mono text-xs text-slate-400 font-normal">
+                ({sortedAndFilteredBonds.length} of {bonds.length} listed)
+              </span>
+            </h3>
+
+            {/* Select All checkbox triggers */}
+            {sortedAndFilteredBonds.length > 0 && (
+              <button
+                onClick={() => handleSelectAllFiltered(sortedAndFilteredBonds)}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/60 rounded border border-slate-200/50 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+              >
+                {sortedAndFilteredBonds.every(b => selectedSerials.includes(b.serial)) ? (
+                  <>
+                    <CheckSquare className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Deselect All Listed</span>
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Select All Listed for Cash Out</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Responsive Table Layout */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-850 text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">
+                  <th className="py-3 px-2 w-12 text-center">Cashout</th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onClick={() => handleSort('serial')}>
+                    <div className="flex items-center gap-1">
+                      Serial #
+                      {sortBy === 'serial' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-center" onClick={() => handleSort('series')}>
+                    <div className="flex items-center justify-center gap-1">
+                      Series
+                      {sortBy === 'series' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('denomination')}>
+                    <div className="flex items-center justify-end gap-1">
+                      Denom
+                      {sortBy === 'denomination' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-center" onClick={() => handleSort('issueDate')}>
+                    <div className="flex items-center justify-center gap-1">
+                      Issue Date
+                      {sortBy === 'issueDate' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-center" onClick={() => handleSort('finalMaturity')}>
+                    <div className="flex items-center justify-center gap-1">
+                      Maturity
+                      {sortBy === 'finalMaturity' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('issuePrice')}>
+                    <div className="flex items-center justify-end gap-1">
+                      Cost
+                      {sortBy === 'issuePrice' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('interest')}>
+                    <div className="flex items-center justify-end gap-1">
+                      Interest
+                      {sortBy === 'interest' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right animate-pulse-subtle" onClick={() => handleSort('interestRate')}>
+                    <div className="flex items-center justify-end gap-1">
+                      Rate
+                      {sortBy === 'interestRate' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none text-right" onClick={() => handleSort('value')}>
+                    <div className="flex items-center justify-end gap-1">
+                      Value
+                      {sortBy === 'value' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2 w-40">Note</th>
+                  <th className="py-3 px-2 w-10 text-center"></th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono text-xs">
+                {sortedAndFilteredBonds.length > 0 ? (
+                  sortedAndFilteredBonds.map(b => {
+                    const isSelected = selectedSerials.includes(b.serial);
+                    const isMatured = isBondMatured(b.finalMaturity, REF_YEAR, REF_MONTH);
+
+                    return (
+                      <tr 
+                        key={b.serial}
+                        className={`hover:bg-slate-50/50 dark:hover:bg-slate-850/40 transition-colors ${
+                          isSelected 
+                            ? 'bg-amber-500/5 dark:bg-amber-500/10' 
+                            : isMatured 
+                              ? 'bg-amber-500/[0.02] dark:bg-amber-500/[0.02]' 
+                              : ''
+                        }`}
+                      >
+                        {/* Checkbox */}
+                        <td className="py-2 px-2 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => handleToggleSelect(b.serial)}
+                            className="inline-flex focus:outline-none hover:scale-110 transition-transform cursor-pointer"
+                            title={isSelected ? "Unmark this bond for Cash Out" : "Mark this bond for Cash Out & Tax liability"}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-amber-500" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                            )}
+                          </button>
+                        </td>
+
+                        {/* Serial # */}
+                        <td className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300">
+                          {b.serial}
+                        </td>
+
+                        {/* Series Badge */}
+                        <td className="py-2 px-2 text-center">
+                          {b.series === 'I' ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                              I
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-400">
+                              EE
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Denomination */}
+                        <td className="py-2 px-2 text-right text-slate-500 dark:text-slate-400">
+                          ${b.denomination.toLocaleString('en-US')}
+                        </td>
+
+                        {/* Issue Date */}
+                        <td className="py-2 px-2 text-center text-slate-500 dark:text-slate-400">
+                          {b.issueDate}
+                        </td>
+
+                        {/* Maturity Date */}
+                        <td className="py-2 px-2 text-center">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-slate-600 dark:text-slate-300">{b.finalMaturity}</span>
+                            {isMatured && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400 rounded-full animate-pulse-subtle">
+                                MATURED
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Cost */}
+                        <td className="py-2 px-2 text-right text-slate-500 dark:text-slate-400">
+                          ${b.issuePrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Interest */}
+                        <td className="py-2 px-2 text-right text-emerald-600 dark:text-emerald-400 font-semibold">
+                          +${b.interest.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Rate */}
+                        <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300 font-bold">
+                          {b.interestRate.toFixed(2)}%
+                        </td>
+
+                        {/* Current Value */}
+                        <td
+                          className="py-2 px-2 text-right text-blue-600 dark:text-blue-400 font-bold"
+                          title={formatAsOfLabel(b.valueAsOf)}
+                        >
+                          ${b.value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Notes column (with inline editing).
+                            The view state is capped at a fixed w-40 wrapper so
+                            long notes ellipsize instead of widening the table
+                            (`truncate` on the <td> itself does not work in
+                            auto table layout). The full note stays available
+                            via the native title tooltip. The editor is bounded
+                            by a w-36 input so entering edit mode adds only a
+                            few pixels of table width. */}
+                        <td className="py-2 px-2 text-[11px]">
+                          {editingSerial === b.serial ? (
+                            <div className="flex items-center gap-1.5">
+                              <input 
+                                type="text"
+                                value={editingNote}
+                                onChange={(e) => setEditingNote(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveNote(b.serial);
+                                  if (e.key === 'Escape') setEditingSerial(null);
+                                }}
+                                className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded text-[11px] font-sans text-slate-800 dark:text-white w-32"
+                                autoFocus
+                              />
+                              <button 
+                                onClick={() => handleSaveNote(b.serial)}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 rounded"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => setEditingSerial(null)}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 rounded"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-40 overflow-hidden" title={b.note || undefined}>
+                              <div className="group flex items-center justify-between gap-1.5">
+                                <span className="text-slate-500 dark:text-slate-400 italic truncate min-w-0 flex-1">
+                                  {b.note || "—"}
+                                </span>
+                                <button 
+                                  onClick={() => handleStartEditNote(b.serial, b.note)}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded transition-opacity flex-shrink-0"
+                                  title="Edit note"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Deletion action */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            onClick={() => handleDeleteBond(b.serial)}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                            title="Remove bond from portfolio"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={12} className="py-8 px-6 text-slate-500 font-sans">
+                      {bonds.length === 0 ? (
+                        <div className="max-w-3xl mx-auto bg-gradient-to-br from-slate-50 to-amber-50/40 dark:from-slate-900/60 dark:to-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl p-8">
+                          <div className="text-center mb-6">
+                            <Coins className="w-10 h-10 mx-auto mb-3 text-amber-500" />
+                            <h4 className="font-display font-bold text-xl text-slate-800 dark:text-slate-100 mb-2">
+                              Your portfolio is empty
+                            </h4>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto">
+                              Pick a starting option below. The app will not load
+                              sample data behind your back — you choose how it
+                              begins.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
+                              <BookOpen className="w-5 h-5 text-amber-500 mb-2" />
+                              <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+                                Import from TreasuryDirect
+                              </h5>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                                Save an HTML report from the official calculator
+                                and drop it on the import area in the sidebar.
+                              </p>
+                              <a
+                                href={TREASURY_CALCULATOR_URL}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-bold"
+                              >
+                                Open calculator →
+                              </a>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
+                              <Plus className="w-5 h-5 text-emerald-500 mb-2" />
+                              <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+                                Add one manually
+                              </h5>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                                Use the amber “New Bond Entry +” button above
+                                to enter a single bond.
+                              </p>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 text-left">
+                              <RefreshCw className="w-5 h-5 text-indigo-500 mb-2" />
+                              <h5 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+                                Explore with samples
+                              </h5>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                                Try {SAMPLE_BONDS.length} example bonds matching the official
+                                Treasury calculator output.
+                              </p>
+                              <button
+                                onClick={handleLoadSample}
+                                className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-bold cursor-pointer"
+                              >
+                                Load sample portfolio →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                          <h4 className="font-semibold text-slate-700 dark:text-slate-300">No Savings Bonds Found</h4>
+                          <p className="text-xs mt-1">No bonds match your active search filter criteria.</p>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+
+              {/* Totals Summary Row */}
+              {sortedAndFilteredBonds.length > 0 && (
+                <tfoot className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 font-mono text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <tr>
+                    <td colSpan={3} className="py-3 px-2 text-slate-500 font-sans text-right">
+                      Page Totals ({sortedAndFilteredBonds.length} Bonds)
+                    </td>
+                    <td className="py-3 px-2 text-right">
+                      ${sortedAndFilteredBonds.reduce((sum, b) => sum + b.denomination, 0).toLocaleString('en-US')}
+                    </td>
+                    <td colSpan={2}></td>
+                    <td className="py-3 px-2 text-right">
+                      ${sortedAndFilteredBonds.reduce((sum, b) => sum + b.issuePrice, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3 px-2 text-right text-emerald-600 dark:text-emerald-400">
+                      +${sortedAndFilteredBonds.reduce((sum, b) => sum + b.interest, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td></td>
+                    <td className="py-3 px-2 text-right text-blue-600 dark:text-blue-400">
+                      ${sortedAndFilteredBonds.reduce((sum, b) => sum + b.value, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
+        </section>
 
       </main>
 
